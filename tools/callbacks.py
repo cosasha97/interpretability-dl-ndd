@@ -1,3 +1,5 @@
+import torch
+
 
 class ModelCheckpoint(object):
     def __init__(self, mode='min', min_delta=0):

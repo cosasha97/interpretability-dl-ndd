@@ -1,3 +1,10 @@
+import numpy as np
+from torchsummary import summary
+from math import floor
+
+# torch
+import torch.nn as nn
+
 
 class Net(nn.Module):
     def __init__(self, sample, convolutions):

@@ -1,3 +1,12 @@
+import torch
+import numpy as np
+import pandas as pd
+
+# clinicaDL
+from clinicadl.tools.deep_learning.data import generate_sampler, return_dataset, MRIDataset, MRIDatasetImage, MRIDatasetSlice, get_transforms
+
+
+
 def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2'):
     """
     Fetch additional data: age, sex and volumes.
