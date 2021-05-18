@@ -76,11 +76,15 @@ df_add_data = fetch_add_data(training_df)
 
 # follow structure of ``train_single_cnn``
 
-training_df['slice_id'] = 85
-valid_df['slice_id'] = 85
+# training_df['slice_id'] = 85
+# valid_df['slice_id'] = 85
 # dataset iterator
-data_train = MRIDatasetSlice(caps_directory, training_df, slice_index=85, mixed=True, df_add_data=df_add_data) #train_transformations=all_transforms,  slice_index=85, mixed=True
-data_valid = MRIDatasetSlice(caps_directory, valid_df, slice_index=85, mixed=True, df_add_data=df_add_data) #train_transformations=all_transforms,
+# data_train = MRIDatasetSlice(caps_directory, training_df, slice_index=85, mixed=True, df_add_data=df_add_data) #train_transformations=all_transforms
+# data_valid = MRIDatasetSlice(caps_directory, valid_df, slice_index=85, mixed=True, df_add_data=df_add_data) #train_transformations=all_transforms,
+
+data_train = MRIDatasetSlice(caps_directory, training_df, df_add_data=df_add_data) #train_transformations=all_transforms
+data_valid = MRIDatasetSlice(caps_directory, valid_df, df_add_data=df_add_data) #train_transformations=all_transforms,
+
 # sampler
 train_sampler = generate_sampler(data_train)
 valid_sampler = generate_sampler(data_valid)
