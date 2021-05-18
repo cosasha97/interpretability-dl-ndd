@@ -111,7 +111,7 @@ if torch.cuda.is_available():
 model.summary()
 
 # define number of epochs
-nb_epochs = 20
+nb_epochs = 40
 # optimizer
 optimizer = optim.Adam(model.parameters(),lr=learning_rate)
 # device
