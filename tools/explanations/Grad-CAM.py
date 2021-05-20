@@ -128,4 +128,4 @@ class GradCam():
         for k, branch in enumerate(branch2target):
             ax[indexes[k]].set_title(branch2target[branch])
             if plot_img: ax[indexes[k]].imshow(formatted_img)
-            ax[indexes[k]].imshow(cams[branch], cmap='bwr', alpha=0.3)
+            ax[indexes[k]].imshow(self.cams[branch], cmap='bwr', alpha=0.3)
