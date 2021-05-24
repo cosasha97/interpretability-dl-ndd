@@ -92,7 +92,7 @@ class GradCam():
                                                     input_image.shape[2]), Image.ANTIALIAS)) / 255
         return cam
 
-    def generate_all_cams(self, input_image):
+    def get_explanations(self, input_image):
         """
         Generate Grad-CAM attention maps for all branches.
         """
@@ -109,7 +109,7 @@ class GradCam():
             plot_img: bool. If True, plot attention map on top of input image.
         """
         if not self.cams:
-            _ = self.generate_all_cams(img)
+            _ = self.get_explanations(img)
 
         ## format image for visualization
         # rgb dimension set to last dimension
