@@ -12,6 +12,9 @@ def max_sensitivity(X, exp_method, N=1000, alpha=0.5):
         N: number of iterations
         alpha: float, multiplicative parameter of the std of the gaussian law used to sample noise
     """
+    if torch.cuda.is_available():
+        X = X.cuda()
+
     max_diff = dict()
     expls = exp_method.get_explanations(X)
     for _ in range(N):

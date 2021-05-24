@@ -96,6 +96,8 @@ class GradCam():
         """
         Generate Grad-CAM attention maps for all branches.
         """
+        if torch.cuda.is_available():
+            input_image = input_image.cuda()
         branches = ['branch' + str(k) for k in range(1, 5)]
         for branch in branches:
             self.cams[branch] = self.generate_cam(input_image, branch=branch)
