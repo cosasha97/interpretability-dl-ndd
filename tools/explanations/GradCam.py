@@ -51,8 +51,6 @@ class GradCam():
         self.model.eval()
         # Define extractor
         self.extractor = CamExtractor(self.model, target_layer)
-        # grad-cam attention maps
-        self.cams = {}
 
     def generate_cam(self, input_image, branch='branch1'):
         """
@@ -98,10 +96,12 @@ class GradCam():
         """
         if torch.cuda.is_available():
             input_image = input_image.cuda()
+        # grad-cam attention maps
+        cams = {}
         branches = ['branch' + str(k) for k in range(1, 5)]
         for branch in branches:
-            self.cams[branch] = self.generate_cam(input_image, branch=branch)
-        return self.cams
+            cams[branch] = self.generate_cam(input_image, branch=branch)
+        return cams
 
     def visualize_cams(self, img, plot_img=True):
         """
@@ -110,8 +110,7 @@ class GradCam():
             img: array or tensor
             plot_img: bool. If True, plot attention map on top of input image.
         """
-        if not self.cams:
-            _ = self.get_explanations(img)
+        cams = self.get_explanations(img)
 
         ## format image for visualization
         # rgb dimension set to last dimension
@@ -130,4 +129,4 @@ class GradCam():
         for k, branch in enumerate(branch2target):
             ax[indexes[k]].set_title(branch2target[branch])
             if plot_img: ax[indexes[k]].imshow(formatted_img)
-            ax[indexes[k]].imshow(self.cams[branch], cmap='bwr', alpha=0.3)
+            ax[indexes[k]].imshow(cams[branch], cmap='bwr', alpha=0.3)

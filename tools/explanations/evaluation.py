@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 
-def max_sensitivity(X, exp_method, N=1000, alpha=0.5):
+def max_sensitivity(X, exp_method, N=1000, alpha=1):
     """
     Max-Sensitivity measures the reliability in terms of the maximum change in an explanation.
     Args:
@@ -16,6 +16,7 @@ def max_sensitivity(X, exp_method, N=1000, alpha=0.5):
         X = X.cuda()
 
     max_diff = dict()
+    # explanations for original image
     expls = exp_method.get_explanations(X)
     for _ in range(N):
         # create noisy image
@@ -25,7 +26,7 @@ def max_sensitivity(X, exp_method, N=1000, alpha=0.5):
         noisy_expls = exp_method.get_explanations(noisy_X)
         # compute differences in explanations
         for target in noisy_expls:
-            diff = np.linalg.norm(noisy_expls[target] - expls[target])/np.linalg.norm(expls[target])
+            diff = np.linalg.norm(noisy_expls[target] - expls[target]) / np.linalg.norm(expls[target])
             if target not in max_diff:
                 max_diff[target] = diff
             else:
