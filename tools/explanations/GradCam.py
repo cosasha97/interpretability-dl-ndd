@@ -115,7 +115,7 @@ class GradCam():
 
         ## format image for visualization
         # rgb dimension set to last dimension
-        formatted_img = np.transpose(img, (0, 2, 3, 1))[0, ...]
+        formatted_img = np.transpose(img.cpu(), (0, 2, 3, 1))[0, ...]
         formatted_img = (formatted_img - formatted_img.min()) / formatted_img.max()
 
         branch2target = {
