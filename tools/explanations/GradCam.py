@@ -68,10 +68,7 @@ class GradCam():
         self.model.features.zero_grad()
         getattr(self.model, branch).zero_grad()
         # Backward pass with specified target
-        if torch.cuda.is_available():
-            model_output.sum().backward(retain_graph=True)
-        else:
-            model_output.sum().backward(retain_graph=True)
+        model_output.sum().backward(retain_graph=True)
         # Get hooked gradients
         guided_gradients = self.extractor.gradients.cpu().data.numpy()[0]
         # Get convolution outputs
