@@ -118,7 +118,7 @@ class GradCam():
         formatted_img = (formatted_img - formatted_img.min()) / formatted_img.max()
 
         branch2target = {
-            'branch1': 'classification',
+            'branch1': 'disease',
             'branch2': 'volumes',
             'branch3': 'age',
             'branch4': 'sex'

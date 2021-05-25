@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 
-def max_sensitivity(X, exp_method, N=1000, alpha=1):
+def max_sensitivity(X, exp_method, N=10, alpha=1):
     """
     Max-Sensitivity measures the reliability in terms of the maximum change in an explanation.
     Args:
