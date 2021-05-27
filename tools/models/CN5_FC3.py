@@ -30,7 +30,7 @@ class Net(nn.Module):
         self.dense_size_1 = 32
         self.dense_size_2 = 16
 
-        # classifyer
+        # disease
         self.branch1 = nn.Sequential(
             nn.Linear(self.features_output_size, self.dense_size_1),
             nn.ReLU(),

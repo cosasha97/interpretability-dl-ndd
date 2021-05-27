@@ -1,10 +1,10 @@
 import torch
 import numpy as np
 import pandas as pd
+from os import path
 
 # clinicaDL
 from clinicadl.tools.deep_learning.data import generate_sampler, return_dataset, MRIDataset, MRIDatasetImage, MRIDatasetSlice, get_transforms
-
 
 
 def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2'):
@@ -67,8 +67,6 @@ class MRIDatasetSlice(MRIDataset):
             all_transformations (callable, options): Optional transform to be applied during training and evaluation.
             multi_cohort (bool): If True caps_directory is the path to a TSV file linking cohort names and paths.
             df_add_data (DataFrame): dataframe containing additional data to predict, such as volumes
-            training_data_file: dataframe containing the subject/session list for training.
-                If None, data_file is selected as training_data_file
         """
         # additional data
         self.df_add_data = df_add_data
