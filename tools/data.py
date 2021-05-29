@@ -159,3 +159,57 @@ class MRIDatasetSlice(MRIDataset):
         triple_slice = torch.stack((simple_slice, simple_slice, simple_slice))
 
         return triple_slice
+
+
+class MRIDatasetImage(MRIDataset):
+    """Dataset of MRI organized in a CAPS folder."""
+
+    def __init__(self, caps_directory, data_file,
+                 preprocessing='t1-linear', train_transformations=None,
+                 labels=True, all_transformations=None, multi_cohort=False,
+                 df_add_data=None):
+        """
+        Args:
+            caps_directory (string): Directory of all the images.
+            data_file (string or DataFrame): Path to the tsv file or DataFrame containing the subject/session list.
+            preprocessing (string): Defines the path to the data in CAPS.
+            train_transformations (callable, optional): Optional transform to be applied only on training mode.
+            labels (bool): If True the diagnosis will be extracted from the given DataFrame.
+            all_transformations (callable, options): Optional transform to be applied during training and evaluation.
+            multi_cohort (bool): If True caps_directory is the path to a TSV file linking cohort names and paths.
+            df_add_data (DataFrame): dataframe containing additional data to predict, such as volumes
+        """
+        self.df_add_data = df_add_data
+
+        self.elem_index = None
+        self.mode = "image"
+        super().__init__(caps_directory, data_file, preprocessing,
+                         augmentation_transformations=train_transformations, labels=labels,
+                         transformations=all_transformations, multi_cohort=multi_cohort)
+
+    def __getitem__(self, idx):
+        participant, session, cohort, _, label = self._get_meta_data(idx)
+
+        image_path = self._get_path(participant, session, cohort, "image")
+        image = torch.load(image_path)
+
+        if self.transformations:
+            image = self.transformations(image)
+
+        if self.augmentation_transformations and not self.eval_mode:
+            image = self.augmentation_transformations(image)
+
+        ## fetch additional data
+        temp_df = self.df_add_data[(self.df_add_data.participant_id == participant) &
+                                   (self.df_add_data.session_id == session)]
+        sex = (temp_df.sex.to_numpy().item() == 'F') + 0.
+        age = temp_df.age.to_numpy().item()
+        volumes = temp_df.drop(columns=['participant_id', 'session_id', 'sex', 'age']).to_numpy().squeeze()
+
+        sample = {'image': image, 'label': label, 'participant_id': participant, 'session_id': session,
+                  'image_path': image_path, 'age': age, 'sex': sex, 'volumes': volumes}
+
+        return sample
+
+    def num_elem_per_image(self):
+        return 1

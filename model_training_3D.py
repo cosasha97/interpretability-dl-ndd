@@ -2,7 +2,7 @@ import torch.optim as optim
 
 # clinicaDL
 from clinicadl.tools.tsv.data_split import create_split
-from clinicadl.tools.deep_learning.data import generate_sampler, return_dataset, MRIDataset, MRIDatasetImage, MRIDatasetSlice, get_transforms
+from clinicadl.tools.deep_learning.data import generate_sampler, return_dataset, MRIDataset, get_transforms
 from torch.utils.data import DataLoader
 from clinicadl.tools.deep_learning import EarlyStopping
 
