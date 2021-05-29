@@ -9,7 +9,7 @@ class CamExtractor():
     Extracts cam features from the model
     """
 
-    def __init__(self, model, target_layer):
+    def __init__(self, model, target_layer=None):
         self.model = model
         self.target_layer = target_layer
         self.gradients = None
@@ -17,27 +17,43 @@ class CamExtractor():
     def save_gradient(self, grad):
         self.gradients = grad
 
-    def forward_pass_on_convolutions(self, x):
+    def forward_pass_on_convolutions(self, x, branch=None):
         """
         Does a forward pass on convolutions, hooks the function at given layer
         """
         conv_output = None
-        for module_pos, module in self.model.features._modules.items():
-            x = module(x)  # Forward
-            if module_pos == self.target_layer:
-                x.register_hook(self.save_gradient)
-                conv_output = x  # Save the convolution output on that layer
+        if self.target_layer is not None:
+            for module_pos, module in self.model.features._modules.items():
+                x = module(x)  # Forward
+                if module_pos == self.target_layer:
+                    x.register_hook(self.save_gradient)
+                    conv_output = x  # Save the convolution output on that layer
+        else:
+            if branch is None:
+                raise Exception("Either target_layer or branch must not be None.")
+            x = self.model.features(x)
+            module_pos, module = next(iter(getattr(self.model, branch)._modules.items()))
+            x = module(x)
+            x.register_hook(self.save_gradient)
+            conv_output = x
+
         return conv_output, x
 
-    def forward_pass(self, x, branch):
+    def forward_pass(self, x, branch=None):
         """
         Does a full forward pass on the model
         """
         # Forward pass on the convolutions
-        conv_output, x = self.forward_pass_on_convolutions(x)
-        x = x.view(x.size(0), -1)  # Flatten
-        # Forward pass on the classifier
-        x = getattr(self.model, branch)(x)
+        conv_output, x = self.forward_pass_on_convolutions(x, branch)
+        if self.target_layer is not None:
+            # x = x.view(x.size(0), -1)  # Flatten
+            # Forward pass on the classifier
+            x = getattr(self.model, branch)(x)
+        else:
+            for k, (module_pos, module) in enumerate(getattr(self.model, branch)._modules.items()):
+                if k != 0:
+                    # do not apply again last convolution
+                    x = module(x)  # Forward
         return conv_output, x
 
 
@@ -46,7 +62,7 @@ class GradCam():
         Produces class activation map
     """
 
-    def __init__(self, model, target_layer):
+    def __init__(self, model, target_layer=None):
         self.model = model
         self.model.eval()
         # Define extractor
@@ -58,6 +74,8 @@ class GradCam():
             input_image: array
             branch: string, name of the branch
         """
+        while len(input_image.shape) < 5:
+            input_image = input_image[None, ...]
         # Full forward pass
         # conv_output is the output of convolutions at specified layer
         # model_output is the final output of the model (1, 1000)
@@ -70,21 +88,23 @@ class GradCam():
         # Backward pass with specified target
         model_output.sum().backward(retain_graph=True)
         # Get hooked gradients
-        guided_gradients = self.extractor.gradients.cpu().data.numpy()[0]
+        guided_gradients = self.extractor.gradients.data[0]
         # Get convolution outputs
-        target = conv_output.cpu().data.numpy()[0]
+        target = conv_output.data[0]
         # Get weights from gradients
-        weights = np.mean(guided_gradients, axis=(1, 2))  # Take averages for each gradient
+        weights = guided_gradients.mean(axis=(1, 2, 3))  # Take averages for each gradient
         # Create empty numpy array for cam
-        cam = np.ones(target.shape[1:], dtype=np.float32)
+        if torch.cuda.is_available():
+            cam = torch.ones(target.shape[1:], dtype=torch.float).cuda()
+        else:
+            cam = torch.ones(target.shape[1:], dtype=torch.float)
         # Multiply each weight with its conv output and then, sum
         for i, w in enumerate(weights):
             cam += w * target[i, :, :]
-        cam = np.maximum(cam, 0)
+        cam = np.maximum(cam.cpu(), 0).data.numpy()
         cam = (cam - np.min(cam)) / (np.max(cam) - np.min(cam))  # Normalize between 0-1
-        cam = np.uint8(cam * 255)  # Scale between 0-255 to visualize
-        cam = np.uint8(Image.fromarray(cam).resize((input_image.shape[3],
-                                                    input_image.shape[2]), Image.ANTIALIAS)) / 255
+        # resize to shape of input image
+        # cam = zoom(cam, input_image.shape[-3:]/np.array(cam.shape))
         return cam
 
     def get_explanations(self, input_image):
@@ -99,31 +119,3 @@ class GradCam():
         for branch in branches:
             cams[branch] = self.generate_cam(input_image, branch=branch)
         return cams
-
-    def visualize_cams(self, img, plot_img=True):
-        """
-        Visualize cams for all branches.
-        Args:
-            img: array or tensor
-            plot_img: bool. If True, plot attention map on top of input image.
-        """
-        cams = self.get_explanations(img)
-
-        ## format image for visualization
-        # rgb dimension set to last dimension
-        formatted_img = np.transpose(img.cpu(), (0, 2, 3, 1))[0, ...]
-        formatted_img = (formatted_img - formatted_img.min()) / formatted_img.max()
-
-        branch2target = {
-            'branch1': 'disease',
-            'branch2': 'volumes',
-            'branch3': 'age',
-            'branch4': 'sex'
-        }
-
-        fig, ax = plt.subplots(2, 2, figsize=(10, 10))
-        indexes = [(0, 0), (0, 1), (1, 0), (1, 1)]
-        for k, branch in enumerate(branch2target):
-            ax[indexes[k]].set_title(branch2target[branch])
-            if plot_img: ax[indexes[k]].imshow(formatted_img)
-            ax[indexes[k]].imshow(cams[branch], cmap='bwr', alpha=0.3)
