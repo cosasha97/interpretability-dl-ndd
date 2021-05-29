@@ -86,14 +86,14 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 cuda = torch.device('cuda')
 # record losses
 train_losses = {
-    'classification': np.zeros(nb_epochs),
+    'disease': np.zeros(nb_epochs),
     'volumes': np.zeros(nb_epochs),
     'age': np.zeros(nb_epochs),
     'sex': np.zeros(nb_epochs),
     'train': np.zeros(nb_epochs)
 }
 test_losses = {
-    'classification': np.zeros(nb_epochs),
+    'disease': np.zeros(nb_epochs),
     'volumes': np.zeros(nb_epochs),
     'age': np.zeros(nb_epochs),
     'sex': np.zeros(nb_epochs),
