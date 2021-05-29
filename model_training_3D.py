@@ -12,6 +12,8 @@ from tools.callbacks import *
 from tools.data import *
 from train.train_CNN import *
 
+print("Beginning of the script - TRAINING")
+
 # global parameters
 caps_directory = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021/'
 batch_size = 4
@@ -101,6 +103,8 @@ test_losses = {
 # callbacks
 ES = EarlyStopping(patience=5)
 MC = ModelCheckpoint()
+
+print("Beginning of the training")
 
 # training
 for epoch in range(nb_epochs):
