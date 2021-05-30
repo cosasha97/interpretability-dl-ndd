@@ -13,6 +13,7 @@ from tools.data import *
 from train.train_CNN import *
 
 print("Beginning of the script - TRAINING")
+suffix = '_3D_2'
 
 # global parameters
 caps_directory = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021/'
@@ -73,13 +74,13 @@ valid_loader = DataLoader(data_valid,
 # get sample
 sample = data_train[0]
 # build model
-model = Net(sample, [8, 16, 32, 64, 128])
+model = Net(sample, [8, 16, 32, 64, 128], 0.3)
 if torch.cuda.is_available():
     print("To cuda")
     model.cuda()
 model.summary()
 
-nb_epochs = 20
+nb_epochs = 30
 # optimizer
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 # device
@@ -112,7 +113,7 @@ for epoch in range(nb_epochs):
     update_dict(test_losses, test(model, cuda, valid_loader), epoch)
     if ES.step(train_losses['train'][epoch]):
         break
-    MC.step(train_losses['train'][epoch], epoch, model, optimizer, 'model_3D')  # path
+    MC.step(train_losses['train'][epoch], epoch, model, optimizer, 'model' + suffix)  # path
 
 
 # save training curves
@@ -121,5 +122,5 @@ def save_loss(loss, name="loss"):
     df[df.any(axis=1)].to_csv(name + '.csv', index=False)
 
 
-save_loss(train_losses, 'train_losses_3D')
-save_loss(test_losses, 'val_losses_3D')
+save_loss(train_losses, 'train_losses' + suffix)
+save_loss(test_losses, 'val_losses' + suffix)
