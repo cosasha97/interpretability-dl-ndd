@@ -72,7 +72,7 @@ class GradCam():
         else:
             self.null_scalar = torch.FloatTensor((1,)).fill_(0.)
 
-    def generate_cam(self, input_image, branch='branch1', resize=True):
+    def generate_cam(self, input_image, branch='branch1', resize=False):
         """
         Args:
             input_image: array
@@ -98,17 +98,16 @@ class GradCam():
         target = conv_output.data[0]
         # Get weights from gradients
         weights = guided_gradients.mean(axis=(1, 2, 3))  # Take averages for each gradient
-        #Multiply each weight with its conv output and then, sum
-        cam = (weights.view(weights.shape + (1,1,1)) * target).sum(axis=0)
-        #cam = np.maximum(cam.cpu(), 0).data.numpy()
+        # Multiply each weight with its conv output and then, sum
+        cam = (weights.view(weights.shape + (1, 1, 1)) * target).sum(axis=0)
         cam = torch.where(cam > self.null_scalar, cam, self.null_scalar)
         cam = (cam - cam.min()) / (cam.max() - cam.min())  # Normalize between 0-1
         # resize to shape of input image
         if resize:
-            cam = zoom(cam.cpu(), input_image.shape[-3:]/np.array(cam.shape))
+            cam = zoom(cam.cpu(), input_image.shape[-3:] / np.array(cam.shape))
         return cam
 
-    def get_explanations(self, input_image, resize=True):
+    def get_explanations(self, input_image, resize=False):
         """
         Generate Grad-CAM attention maps for all branches.
         Args:

@@ -23,7 +23,7 @@ def max_sensitivity(X, exp_method, N=10, alpha=1):
         noisy_X = X + X.data.new(X.size()).normal_(0, alpha * X.std().item()).cuda()
         noisy_X = torch.max(noisy_X, X.min().expand_as(X))
         noisy_X = torch.min(noisy_X, X.max().expand_as(X))
-        noisy_expls = exp_method.get_explanations(noisy_X)
+        noisy_expls = exp_method.get_explanations(noisy_X, resize=False)
         # compute differences in explanations
         for target in noisy_expls:
             diff = np.linalg.norm(noisy_expls[target] - expls[target]) / np.linalg.norm(expls[target])
