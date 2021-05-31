@@ -1,7 +1,7 @@
 import torch
-from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.ndimage import zoom
 
 
 class CamExtractor():
@@ -67,12 +67,17 @@ class GradCam():
         self.model.eval()
         # Define extractor
         self.extractor = CamExtractor(self.model, target_layer)
+        if torch.cuda.is_available():
+            self.null_scalar = torch.cuda.FloatTensor((1,)).fill_(0.)
+        else:
+            self.null_scalar = torch.FloatTensor((1,)).fill_(0.)
 
-    def generate_cam(self, input_image, branch='branch1'):
+    def generate_cam(self, input_image, branch='branch1', resize=True):
         """
         Args:
             input_image: array
             branch: string, name of the branch
+            resize: bool, if True, resize attention maps to input_image shape
         """
         while len(input_image.shape) < 5:
             input_image = input_image[None, ...]
@@ -93,23 +98,23 @@ class GradCam():
         target = conv_output.data[0]
         # Get weights from gradients
         weights = guided_gradients.mean(axis=(1, 2, 3))  # Take averages for each gradient
-        # Create empty numpy array for cam
-        if torch.cuda.is_available():
-            cam = torch.ones(target.shape[1:], dtype=torch.float).cuda()
-        else:
-            cam = torch.ones(target.shape[1:], dtype=torch.float)
-        # Multiply each weight with its conv output and then, sum
-        for i, w in enumerate(weights):
-            cam += w * target[i, :, :]
-        cam = np.maximum(cam.cpu(), 0).data.numpy()
-        cam = (cam - np.min(cam)) / (np.max(cam) - np.min(cam))  # Normalize between 0-1
+        #Multiply each weight with its conv output and then, sum
+        cam = (weights.view(weights.shape + (1,1,1)) * target).sum(axis=0)
+        #cam = np.maximum(cam.cpu(), 0).data.numpy()
+        cam = torch.where(cam > self.null_scalar, cam, self.null_scalar)
+        cam = (cam - cam.min()) / (cam.max() - cam.min())  # Normalize between 0-1
         # resize to shape of input image
-        # cam = zoom(cam, input_image.shape[-3:]/np.array(cam.shape))
+        if resize:
+            cam = zoom(cam.cpu(), input_image.shape[-3:]/np.array(cam.shape))
         return cam
 
-    def get_explanations(self, input_image):
+    def get_explanations(self, input_image, resize=True):
         """
         Generate Grad-CAM attention maps for all branches.
+        Args:
+            input_image: 3D-tensor. 4D-tensor (channel included) and 5D-tensor
+                (batch size dimension included) with dim 1 are also accepted.
+            resize: bool, if True, resize attention maps to input_image shape
         """
         if torch.cuda.is_available():
             input_image = input_image.cuda()
@@ -117,5 +122,5 @@ class GradCam():
         cams = {}
         branches = ['branch' + str(k) for k in range(1, 5)]
         for branch in branches:
-            cams[branch] = self.generate_cam(input_image, branch=branch)
+            cams[branch] = self.generate_cam(input_image, branch=branch, resize=resize)
         return cams
