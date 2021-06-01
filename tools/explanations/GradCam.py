@@ -105,7 +105,7 @@ class GradCam():
         # resize to shape of input image
         if resize:
             cam = zoom(cam.cpu(), input_image.shape[-3:] / np.array(cam.shape))
-        if to_cpu:
+        if to_cpu and not resize:
             cam = cam.cpu()
         return cam
 
