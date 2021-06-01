@@ -17,13 +17,13 @@ def max_sensitivity(X, exp_method, N=10, alpha=1):
 
     max_diff = dict()
     # explanations for original image
-    expls = exp_method.get_explanations(X)
+    expls = exp_method.get_explanations(X, to_cpu=True)
     for _ in range(N):
         # create noisy image
-        noisy_X = X + X.data.new(X.size()).normal_(0, alpha * X.std().item()).cuda()
+        noisy_X = X + torch.normal(0, alpha * X.std(), size=X.size(),device=torch.device('cuda:0'))
         noisy_X = torch.max(noisy_X, X.min().expand_as(X))
         noisy_X = torch.min(noisy_X, X.max().expand_as(X))
-        noisy_expls = exp_method.get_explanations(noisy_X, resize=False)
+        noisy_expls = exp_method.get_explanations(noisy_X, resize=False, to_cpu=True)
         # compute differences in explanations
         for target in noisy_expls:
             diff = np.linalg.norm(noisy_expls[target] - expls[target]) / np.linalg.norm(expls[target])
@@ -31,4 +31,11 @@ def max_sensitivity(X, exp_method, N=10, alpha=1):
                 max_diff[target] = diff
             else:
                 max_diff[target] = max(max_diff[target], diff)
+        # tensor version
+        # for target in noisy_expls:
+        #     diff = torch.linalg.norm(noisy_expls[target] - expls[target]).item() / torch.linalg.norm(expls[target]).item()
+        #     if target not in max_diff:
+        #         max_diff[target] = diff
+        #     else:
+        #         max_diff[target] = max(max_diff[target], diff)
     return max_diff

@@ -72,7 +72,7 @@ class GradCam():
         else:
             self.null_scalar = torch.FloatTensor((1,)).fill_(0.)
 
-    def generate_cam(self, input_image, branch='branch1', resize=False):
+    def generate_cam(self, input_image, branch='branch1', resize=False, to_cpu=False):
         """
         Args:
             input_image: array
@@ -105,15 +105,18 @@ class GradCam():
         # resize to shape of input image
         if resize:
             cam = zoom(cam.cpu(), input_image.shape[-3:] / np.array(cam.shape))
+        if to_cpu:
+            cam = cam.cpu()
         return cam
 
-    def get_explanations(self, input_image, resize=False):
+    def get_explanations(self, input_image, resize=False, to_cpu=False):
         """
         Generate Grad-CAM attention maps for all branches.
         Args:
             input_image: 3D-tensor. 4D-tensor (channel included) and 5D-tensor
                 (batch size dimension included) with dim 1 are also accepted.
             resize: bool, if True, resize attention maps to input_image shape
+            to_cpu: bool, if True, explanation maps are moved to cpu
         """
         if torch.cuda.is_available():
             input_image = input_image.cuda()
@@ -121,5 +124,6 @@ class GradCam():
         cams = {}
         branches = ['branch' + str(k) for k in range(1, 5)]
         for branch in branches:
-            cams[branch] = self.generate_cam(input_image, branch=branch, resize=resize)
+            cams[branch] = self.generate_cam(input_image, branch=branch, resize=resize, to_cpu=to_cpu)
         return cams
+
