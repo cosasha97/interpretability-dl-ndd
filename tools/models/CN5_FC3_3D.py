@@ -1,6 +1,7 @@
 import numpy as np
 from torchsummary import summary
 from math import floor
+from torchmetrics import Accuracy, Recall, Precision, MetricCollection, MeanSquaredError
 
 # torch
 import torch.nn as nn
@@ -71,6 +72,12 @@ class Net(nn.Module):
         self.add_dense_unit(self.branch4, self.features_output_size,
                             self.dense_features + [1], prefix=prefix)
         self.branch4.add_module(prefix + "sigmoid", nn.Sigmoid())
+
+        # metrics
+        self.b1_metrics = MetricCollection([Accuracy(), Recall(), Precision()])
+        self.b2_metrics = MetricCollection([MeanSquaredError()])
+        self.b3_metrics = MetricCollection([MeanSquaredError()])
+        self.b4_metrics = MetricCollection([Accuracy(), Recall(), Precision()])
 
     @staticmethod
     def conv_output_shape(d_h_w, kernel_size=1, stride=1, pad=0, dilation=1):
