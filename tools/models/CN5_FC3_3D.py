@@ -155,10 +155,10 @@ class Net(nn.Module):
         sex = self.branch4(x)
 
         if compute_metrics:
-            self.b1_metrics.update(disease.squeeze().detach(), data['label'].type(torch.int8))
-            self.b2_metrics.update(volumes.detach(), data['volumes'])
-            self.b3_metrics.update(age.squeeze().detach(), data['age'])
-            self.b4_metrics.update(sex.squeeze().detach(), data['sex'].type(torch.int8))
+            self.b1_metrics.update(disease.squeeze().detach(), data['label'].type(torch.int8).detach())
+            self.b2_metrics.update(volumes.detach(), data['volumes'].detach())
+            self.b3_metrics.update(age.squeeze().detach(), data['age'].detach())
+            self.b4_metrics.update(sex.squeeze().detach(), data['sex'].type(torch.int8).detach())
 
         return disease, volumes, age, sex
 
