@@ -76,8 +76,8 @@ class Net(nn.Module):
 
         # metrics
         self.b1_metrics = MetricCollection([Accuracy(), Recall(), Precision()])
-        self.b2_metrics = MetricCollection([R2Score()])
-        self.b3_metrics = MetricCollection([R2Score()])
+        self.b2_metrics = MetricCollection([R2Score(num_outputs=n_volumes, multioutput='uniform_average')])
+        self.b3_metrics = MetricCollection([R2Score(num_outputs=n_volumes, multioutput='uniform_average')])
         self.b4_metrics = MetricCollection([Accuracy(), Recall(), Precision()])
 
     @staticmethod
