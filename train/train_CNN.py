@@ -49,7 +49,7 @@ def train(epoch, model, optimizer_, device, loader):
         # zero the parameter gradients
         optimizer_.zero_grad()
         # forward
-        disease, volumes, age, sex = model(data['image'])
+        disease, volumes, age, sex = model(data, compute_metrics=True)
         losses = compute_loss(disease.float(), data['label'].float(),
                               volumes.float(), data['volumes'].float(),
                               age.float(), data['age'].float(),

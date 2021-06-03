@@ -129,13 +129,39 @@ class Net(nn.Module):
         sequential_block.add_module(prefix + 'linear' + str(len(dense_features) - 1),
                                     nn.Linear(in_features, dense_features[-1]))
 
-    def forward(self, x):
-        x = self.features(x)
+    def forward(self, data, compute_metrics=False):
+        x = self.features(data['image'])
         disease = self.branch1(x)
         volumes = self.branch2(x)
         age = self.branch3(x)
         sex = self.branch4(x)
+
+        if compute_metrics:
+            self.b1_metrics.update(data['label'], disease)
+            self.b2_metrics.update(data['volumes'], volumes)
+            self.b3_metrics.update(data['age'], age)
+            self.b4_metrics.update(data['sex'], sex)
         return disease, volumes, age, sex
+
+    def compute_metrics(self):
+        """
+        Compute global metrics (across all patches seen) for all branches.
+        Return:
+            dictionary: metric_names -> values
+        """
+        all_metrics = dict()
+        for branch in range(1,5):
+            # fetch metrics for each branch and add them to all_metrics dictionary
+            # add prefix to each metric according to the corresponding branch
+            all_metrics.update({f'b{branch}_{k}': v for k, v in getattr(self, 'b' + str(branch) + '_metrics').compute().items()})
+        return all_metrics
+
+    def reset_metrics(self):
+        """
+        Reset all metrics.
+        """
+        for branch in range(1,5):
+            getattr(self, 'b' + str(branch) + '_metrics').reset()
 
     def summary(self):
         """
