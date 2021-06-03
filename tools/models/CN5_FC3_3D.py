@@ -173,7 +173,7 @@ class Net(nn.Module):
             # fetch metrics for each branch and add them to all_metrics dictionary
             # add prefix to each metric according to the corresponding branch
             all_metrics.update(
-                {f'b{branch}_{k}': v for k, v in getattr(self, 'b' + str(branch) + '_metrics').compute().items()})
+                {f'b{branch}_{k}': v.item() for k, v in getattr(self, 'b' + str(branch) + '_metrics').compute().items()})
         return all_metrics
 
     def reset_metrics(self):
