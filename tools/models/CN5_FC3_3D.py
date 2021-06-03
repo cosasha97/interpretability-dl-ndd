@@ -2,7 +2,7 @@ import numpy as np
 from math import floor
 import torch
 from torchinfo import summary
-from torchmetrics import Accuracy, Recall, Precision, MetricCollection, MeanSquaredError
+from torchmetrics import Accuracy, Recall, Precision, MetricCollection, MeanSquaredError, R2Score
 
 # torch
 import torch.nn as nn
@@ -76,8 +76,8 @@ class Net(nn.Module):
 
         # metrics
         self.b1_metrics = MetricCollection([Accuracy(), Recall(), Precision()])
-        self.b2_metrics = MetricCollection([MeanSquaredError()])
-        self.b3_metrics = MetricCollection([MeanSquaredError()])
+        self.b2_metrics = MetricCollection([R2Score()])
+        self.b3_metrics = MetricCollection([R2Score()])
         self.b4_metrics = MetricCollection([Accuracy(), Recall(), Precision()])
 
     @staticmethod
@@ -155,10 +155,10 @@ class Net(nn.Module):
         sex = self.branch4(x)
 
         if compute_metrics:
-            self.b1_metrics.update(data['label'], disease)
-            self.b2_metrics.update(data['volumes'], volumes)
-            self.b3_metrics.update(data['age'], age)
-            self.b4_metrics.update(data['sex'], sex)
+            self.b1_metrics.update(disease.squeeze(), data['label'].type(torch.int8))
+            self.b2_metrics.update(volumes, data['volumes'])
+            self.b3_metrics.update(age.squeeze(), data['age'])
+            self.b4_metrics.update(sex.squeeze(), data['sex'].type(torch.int8))
 
         return disease, volumes, age, sex
 

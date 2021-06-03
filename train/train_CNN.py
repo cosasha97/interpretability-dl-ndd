@@ -26,7 +26,7 @@ def compute_loss(output_x, true_x, output_v, true_v, output_age, true_age, outpu
 
 def train(epoch, model, optimizer_, device, loader):
     """
-    Training of a vae model
+    Training of multi-branch model
     :param epoch: int, epoch index
     :param model: pytorch model
     :param optimizer_: pytorch optimizer
@@ -34,6 +34,7 @@ def train(epoch, model, optimizer_, device, loader):
     :param loader: data loader
     """
 
+    model.reset_metrics()
     model.train()
     train_loss = 0
     L_disease, L_vol, L_age, L_sex = 0, 0, 0, 0
@@ -81,7 +82,7 @@ def train(epoch, model, optimizer_, device, loader):
             'volumes': L_vol,
             'age': L_age,
             'sex': L_sex,
-            'train': train_loss}
+            'train': train_loss}.update(model.compute_metrics())
 
 
 def test(model, device, loader):
@@ -100,7 +101,7 @@ def test(model, device, loader):
                     data[key] = data[key].to(device)
                 except AttributeError:
                     pass
-            disease, volumes, age, sex = model(data['image'])
+            disease, volumes, age, sex = model(data['image'], compute_metrics=True)
             losses = compute_loss(disease.float(), data['label'].float(),
                                   volumes.float(), data['volumes'].float(),
                                   age.float(), data['age'].float(),
