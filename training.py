@@ -136,7 +136,7 @@ for epoch in range(args.nb_epochs):
             epoch,
             model,
             optimizer,
-            os.path.join(args.output_dir, 'model.pt'))
+            args.output_dir)
 
 
 # save training curves

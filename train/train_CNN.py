@@ -71,6 +71,7 @@ def train(epoch, model, optimizer_, loader, to_cuda=True):
         # backward + optimize
         losses[-1].backward()
         optimizer_.step()
+        break
 
     # scale losses
     losses = {'disease': L_disease,
@@ -130,6 +131,7 @@ def test(model, loader, to_cuda=True):
 
             # compute other metrics
             correct += ((disease.float() > 0.5).flatten() == data['label']).float().sum().item()
+            break
 
     # scale losses
     losses = {'disease': L_disease,
