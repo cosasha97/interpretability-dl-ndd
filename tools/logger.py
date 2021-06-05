@@ -38,7 +38,7 @@ def config_logger(dir_path):
         level=logging.DEBUG,
         format='%(asctime)s:%(levelname)s:%(name)s:%(message)s',
         filename=os.path.join(dir_path, 'log.out'),
-        filemode='w'
+        filemode='a'
     )
 
     stdout_logger = logging.getLogger('STDOUT')
