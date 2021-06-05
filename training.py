@@ -53,24 +53,10 @@ if args.name is None:
         model_number = max(ids) + 1
     args.name = 'model_' + str(model_number)
 args.output_dir = os.path.join(args.output_dir, args.name)
-# save commandline
-commandline_to_json(args)
 # configure logger
-#config_logger(args.output_dir)
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s:%(levelname)s:%(name)s:%(message)s',
-    filename='log.out', # os.path.join(args.output_dir, 'log.out'),
-    filemode='w'
-)
-
-stdout_logger = logging.getLogger('STDOUT')
-sl = StreamToLogger(stdout_logger, logging.INFO)
-sys.stdout = sl
-
-stderr_logger = logging.getLogger('STDERR')
-sl = StreamToLogger(stderr_logger, logging.ERROR)
-sys.stderr = sl
+stdout_logger = config_logger(args.output_dir)
+# save commandline
+commandline_to_json(args, logger=stdout_logger)
 
 print("Beginning of the script - TRAINING")
 

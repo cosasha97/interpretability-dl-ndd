@@ -38,7 +38,7 @@ def config_logger(dir_path):
         level=logging.DEBUG,
         format='%(asctime)s:%(levelname)s:%(name)s:%(message)s',
         filename=os.path.join(dir_path, 'log.out'),
-        filemode='a'
+        filemode='w'
     )
 
     stdout_logger = logging.getLogger('STDOUT')
@@ -48,3 +48,5 @@ def config_logger(dir_path):
     stderr_logger = logging.getLogger('STDERR')
     sl = StreamToLogger(stderr_logger, logging.ERROR)
     sys.stderr = sl
+
+    return stdout_logger
