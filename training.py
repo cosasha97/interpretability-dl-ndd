@@ -35,8 +35,8 @@ parser.add_argument('-lr', '--learning_rate', type=float, default=1e-4,
                     help='learning rate')
 parser.add_argument('-wd', '--weight_decay', type=float, default=1e-4,
                     help='weight decay')
-parser.add_argument('-cm', '--checkpoint_metric', type=int, default='train',
-                    help='metric used in model checkpoint (i.e. to assess the model and save the best one)')
+parser.add_argument('--monitor', type=str, default='train',
+                    help='metric used to monitor progress during training')
 
 args = parser.parse_args()
 
@@ -125,9 +125,9 @@ print("Beginning of the training")
 for epoch in range(args.nb_epochs):
     update_dict(train_losses, train(epoch, model, optimizer, train_loader, to_cuda=True))
     update_dict(test_losses, test(model, valid_loader, to_cuda=True))
-    if ES.step(train_losses['train'][epoch]):
+    if ES.step(train_losses[args.monitor][epoch]):
         break
-    MC.step(train_losses[args.checkpoint_metric][epoch],
+    MC.step(train_losses[args.monitor][epoch],
             epoch,
             model,
             optimizer,
