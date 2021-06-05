@@ -24,14 +24,16 @@ def compute_loss(output_x, true_x, output_v, true_v, output_age, true_age, outpu
     return L_disease, L_vol, L_age, L_sex, L_disease + L_vol + L_age + L_sex
 
 
-def train(epoch, model, optimizer_, device, loader):
+def train(epoch, model, optimizer_, loader, to_cuda=True):
     """
     Training of multi-branch model
-    :param epoch: int, epoch index
-    :param model: pytorch model
-    :param optimizer_: pytorch optimizer
-    :param device: cuda device
-    :param loader: data loader
+
+    Args:
+        epoch: int, epoch index
+        model: pytorch model
+        optimizer_: pytorch optimizer
+        loader: data loader
+        to_cuda: bool. If True, moves data to gpu.
     """
 
     model.reset_metrics()
@@ -41,10 +43,10 @@ def train(epoch, model, optimizer_, device, loader):
     # accuracy
     correct = 0
     for batch_idx, data in tqdm(enumerate(loader)):
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and to_cuda:
             for key in data.keys():
                 try:
-                    data[key] = data[key].to(device)
+                    data[key] = data[key].cuda()
                 except AttributeError:
                     pass
         # zero the parameter gradients
@@ -69,43 +71,57 @@ def train(epoch, model, optimizer_, device, loader):
         # backward + optimize
         losses[-1].backward()
         optimizer_.step()
+        break
 
     # scale losses
-    for l in [train_loss, L_disease, L_vol, L_age, L_sex]:
-        l = l / len(loader.dataset)
+    losses = {'disease': L_disease,
+              'volumes': L_vol,
+              'age': L_age,
+              'sex': L_sex,
+              'train': train_loss}
+
+    for key in losses:
+        losses[key] = losses[key] / len(loader.dataset)
+
     # other metrics
     accuracy = 100 * correct / len(loader.dataset)
 
     print('Epoch: {}, Average loss: {:.4f}, Accuracy: {:.2f}'.format(epoch, train_loss, accuracy))
 
-    return {'disease': L_disease,
-            'volumes': L_vol,
-            'age': L_age,
-            'sex': L_sex,
-            'train': train_loss}.update(model.compute_metrics())
+    # scale metrics and add them to dictionary
+    losses.update(model.compute_metrics())
+
+    return losses
 
 
-def test(model, device, loader):
+def test(model, loader, to_cuda=True):
     """
-    Test a trained vae model
-    :param model: pytorch model
+    Test a trained model
+
+    Args:
+        model: pytorch model
+        loader: data loader
+        to_cuda: bool. If True, moves data to gpu.
     """
+    model.reset_metrics()
     model.eval()
     test_loss = 0
     L_disease, L_vol, L_age, L_sex = 0, 0, 0, 0
     correct = 0.
     with torch.no_grad():
         for batch_idx, data in enumerate(loader):
-            for key in data.keys():
-                try:
-                    data[key] = data[key].to(device)
-                except AttributeError:
-                    pass
-            disease, volumes, age, sex = model(data['image'], compute_metrics=True)
+            if torch.cuda.is_available() and to_cuda:
+                for key in data.keys():
+                    try:
+                        data[key] = data[key].cuda()
+                    except AttributeError:
+                        pass
+            disease, volumes, age, sex = model(data, compute_metrics=True)
             losses = compute_loss(disease.float(), data['label'].float(),
                                   volumes.float(), data['volumes'].float(),
                                   age.float(), data['age'].float(),
                                   sex.float(), data['sex'].float())
+
             # update current losses
             test_loss += losses[-1].item()
             L_disease += losses[0].item()
@@ -115,24 +131,40 @@ def test(model, device, loader):
 
             # compute other metrics
             correct += ((disease.float() > 0.5).flatten() == data['label']).float().sum().item()
+            break
 
-    for l in [test_loss, L_disease, L_vol, L_age, L_sex]:
-        l = l / len(loader.dataset)
+    # scale losses
+    losses = {'disease': L_disease,
+              'volumes': L_vol,
+              'age': L_age,
+              'sex': L_sex,
+              'test': test_loss}
+
+    for key in losses:
+        losses[key] = losses[key] / len(loader.dataset)
+
     # other metrics
     accuracy = 100 * correct / len(loader.dataset)
 
     print('Test set loss: {:.4f}, Accuracy: {:.2f}'.format(test_loss, accuracy))
 
-    return {'disease': L_disease,
-            'volumes': L_vol,
-            'age': L_age,
-            'sex': L_sex,
-            'test': test_loss}
+    # scale metrics and add them to dictionary
+    losses.update(model.compute_metrics())
+
+    return losses
 
 
-def update_dict(dictionary, values, epoch):
+def update_dict(global_dict, values):
     """
-    Update dictionary using values.
+    Update global_dict with values.
+
+    Args:
+        global_dict: dictionary
+        values: dictionary
     """
-    for key in values.keys():
-        dictionary[key][epoch] = values[key]
+    if global_dict == {}:
+        for key in values:
+            global_dict[key] = [values[key]]
+    else:
+        for key in values.keys():
+            global_dict[key].append(values[key])
