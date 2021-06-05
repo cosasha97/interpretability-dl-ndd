@@ -60,8 +60,8 @@ commandline_to_json(args)
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s:%(levelname)s:%(name)s:%(message)s',
-    filename=os.path.join(args.output_dir, 'log.out'),
-    filemode='a'
+    filename='log.out', # os.path.join(args.output_dir, 'log.out'),
+    filemode='w'
 )
 
 stdout_logger = logging.getLogger('STDOUT')
