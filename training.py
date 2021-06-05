@@ -45,11 +45,12 @@ args = parser.parse_args()
 caps_directory = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021/'
 if args.name is None:
     # fetch the highest ID already used
-    ids = [int(re.search('\d+', file).group()) for file in os.listdir(args.output_dir)]
+    ids = [re.search('\d+', file) for file in os.listdir(args.output_dir)]
+    ids = [int(match.group()) for match in ids if match is not None]
     if len(ids) == 0:
         model_number = 0
     else:
-        model_number = max(ids)
+        model_number = max(ids) + 1
     args.name = 'model_' + str(model_number)
 args.output_dir = os.path.join(args.output_dir, args.name)
 # save commandline
