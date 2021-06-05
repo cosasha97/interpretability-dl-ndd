@@ -1,4 +1,5 @@
 import torch
+import os
 
 
 class ModelCheckpoint(object):
@@ -9,7 +10,7 @@ class ModelCheckpoint(object):
         self.is_better = None
         self._init_is_better(mode, min_delta)
 
-    def step(self, metrics, epoch, model, optimizer, path="model_0.pt"):
+    def step(self, metrics, epoch, model, optimizer, path=""):
         import numpy as np
 
         if self.best is None:
@@ -36,10 +37,11 @@ class ModelCheckpoint(object):
         if mode == 'max':
             self.is_better = lambda a, best: a > best + best * min_delta
 
-    def save_model(self, metrics, epoch, model, optimizer, path):
+    @staticmethod
+    def save_model(metrics, epoch, model, optimizer, path=""):
         torch.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': metrics,
-        }, path)
+        }, os.path.join(path, "best_model.pt"))
