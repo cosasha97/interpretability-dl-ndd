@@ -2,6 +2,7 @@ import torch.optim as optim
 import os
 import argparse
 import re
+import logging
 
 # clinicaDL
 from clinicadl.tools.tsv.data_split import create_split
@@ -37,8 +38,6 @@ parser.add_argument('-wd', '--weight_decay', type=float, default=1e-4,
 
 args = parser.parse_args()
 
-print("Beginning of the script - TRAINING")
-
 # paths
 caps_directory = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021/'
 if args.name is None:
@@ -47,6 +46,12 @@ if args.name is None:
 output_path = os.path.join(args.output_dir, args.name)
 # save commandline
 commandline_to_json(args)
+# Create and configure logger
+logging.basicConfig(filename=os.path.join(args.output_dir, "logger.log"),
+                    format='%(asctime)s %(message)s',
+                    filemode='w')
+
+print("Beginning of the script - TRAINING")
 
 # load dataframes
 AD = pd.read_csv('subjects/AD.tsv', sep='\t')
