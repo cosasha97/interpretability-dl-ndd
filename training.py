@@ -55,8 +55,21 @@ args.output_dir = os.path.join(args.output_dir, args.name)
 # save commandline
 commandline_to_json(args)
 # configure logger
-config_logger(args.output_dir)
+#config_logger(args.output_dir)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s:%(levelname)s:%(name)s:%(message)s',
+    filename=os.path.join(args.output_dir, 'log.out'),
+    filemode='a'
+)
 
+stdout_logger = logging.getLogger('STDOUT')
+sl = StreamToLogger(stdout_logger, logging.INFO)
+sys.stdout = sl
+
+stderr_logger = logging.getLogger('STDERR')
+sl = StreamToLogger(stderr_logger, logging.ERROR)
+sys.stderr = sl
 
 print("Beginning of the script - TRAINING")
 
