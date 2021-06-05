@@ -16,6 +16,7 @@ from tools.models.CN5_FC3_3D import *
 from tools.callbacks import *
 from tools.data import *
 from train.train_CNN import *
+from tools.logger import  *
 
 # parser
 parser = argparse.ArgumentParser(description='Train 4-branch CNN')
@@ -53,10 +54,9 @@ if args.name is None:
 args.output_dir = os.path.join(args.output_dir, args.name)
 # save commandline
 commandline_to_json(args)
-# Create and configure logger
-logging.basicConfig(filename=os.path.join(args.output_dir, "logger.log"),
-                    format='%(asctime)s %(message)s',
-                    filemode='w')
+# configure logger
+config_logger(args.output_dir)
+
 
 print("Beginning of the script - TRAINING")
 
