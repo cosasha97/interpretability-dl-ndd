@@ -33,7 +33,7 @@ def config_logger(dir_path):
     Args:
         dir_path: string, path to directory where logger output will be stored.
     """
-
+    os.makedirs(dir_path, exist_ok=True)
     logging.basicConfig(
         level=logging.DEBUG,
         format='%(asctime)s:%(levelname)s:%(name)s:%(message)s',
