@@ -5,26 +5,36 @@ from tqdm import tqdm
 import torch.nn as nn
 
 
-def compute_loss(output_x, true_x, output_v, true_v, output_age, true_age, output_sex, true_sex):
+def compute_loss(output_x, true_x, output_v, true_v, output_age, true_age, output_sex, true_sex,
+                 loss_weights=(1., 1., 1., 1.)):
     """
     Compute loss L
-
+    Args:
+        output_x: tensor, model prediction for the disease (label)
+        true_x: tensor, true label
+        output_v: tensor, model prediction for the volumes
+        true_v: tensor, true volumes
+        output_age: tensor, model prediction for age
+        true_age: tensor, true age
+        output_sex: tensor, model prediction for sex
+        true_sex: tensor, true sex
+        loss_weights: list of float, weights to assign to each loss
     """
-    # print(output_x.flatten(), output_v.flatten(), output_age.flatten(), output_sex.flatten())
-    # L1 = nn.L1Loss(reduction='mean')
-    # L_disease = L1(output_x.flatten(), true_x)
-    BCE = nn.BCELoss()
-    L_disease = BCE(output_x.flatten(), true_x)
-    MSE = nn.MSELoss(reduction='mean')
-    L_vol = MSE(output_v, true_v)
-    L_age = MSE(output_age.flatten(), true_age)
-    # L_sex = L1(output_sex, true_sex)
-    L_sex = BCE(output_sex.flatten(), true_sex)
-    # print(L_disease, L_mse, L_age, L_sex, L_disease + L_mse + L_age + L_sex)
-    return L_disease, L_vol, L_age, L_sex, L_disease + L_vol + L_age + L_sex
+    # criteria
+    disease_criterion = nn.BCELoss()
+    sex_criterion = nn.BCELoss()
+    volumes_criterion = nn.MSELoss(reduction='mean')
+    age_criterion = nn.MSELoss(reduction='mean')
+    # computation
+    L_disease = disease_criterion(output_x.flatten(), true_x)
+    L_vol = volumes_criterion(output_v, true_v)
+    L_age = age_criterion(output_age.flatten(), true_age)
+    L_sex = sex_criterion(output_sex.flatten(), true_sex)
+    L_total = L_disease * loss_weights[0] + L_vol * loss_weights[1] + L_age * loss_weights[2] + L_sex * loss_weights[3]
+    return L_disease, L_vol, L_age, L_total
 
 
-def train(epoch, model, optimizer_, loader, to_cuda=True):
+def train(epoch, model, optimizer_, loader, loss_weights=(1., 1., 1., 1.), to_cuda=True):
     """
     Training of multi-branch model
 
@@ -33,6 +43,7 @@ def train(epoch, model, optimizer_, loader, to_cuda=True):
         model: pytorch model
         optimizer_: pytorch optimizer
         loader: data loader
+        loss_weights: list of float, weights to assign to each loss
         to_cuda: bool. If True, moves data to gpu.
     """
 
@@ -56,7 +67,8 @@ def train(epoch, model, optimizer_, loader, to_cuda=True):
         losses = compute_loss(disease.float(), data['label'].float(),
                               volumes.float(), data['volumes'].float(),
                               age.float(), data['age'].float(),
-                              sex.float(), data['sex'].float())
+                              sex.float(), data['sex'].float(),
+                              loss_weights)
 
         # update current losses
         train_loss += losses[-1].item()

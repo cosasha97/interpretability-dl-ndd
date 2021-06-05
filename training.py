@@ -38,6 +38,9 @@ parser.add_argument('-wd', '--weight_decay', type=float, default=1e-4,
                     help='weight decay')
 parser.add_argument('--monitor', type=str, default='train',
                     help='metric used to monitor progress during training')
+parser.add_argument('-lw', '--loss_weights', nargs='+', type=float, default=[1., 1., 1., 1.],
+                    help='weights to assign to each branch loss')
+
 
 args = parser.parse_args()
 
