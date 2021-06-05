@@ -35,6 +35,8 @@ parser.add_argument('-lr', '--learning_rate', type=float, default=1e-4,
                     help='learning rate')
 parser.add_argument('-wd', '--weight_decay', type=float, default=1e-4,
                     help='weight decay')
+parser.add_argument('-cm', '--checkpoint_metric', type=int, default='train',
+                    help='metric used in model checkpoint (i.e. to assess the model and save the best one)')
 
 args = parser.parse_args()
 
@@ -43,7 +45,7 @@ caps_directory = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021/
 if args.name is None:
     model_number = max([int(re.search('\d+', file).group()) for file in os.listdir(args.output_dir)])
     args.name = 'model_' + str(model_number)
-output_path = os.path.join(args.output_dir, args.name)
+args.output_dir = os.path.join(args.output_dir, args.name)
 # save commandline
 commandline_to_json(args)
 # Create and configure logger
@@ -125,7 +127,11 @@ for epoch in range(args.nb_epochs):
     update_dict(test_losses, test(model, valid_loader, to_cuda=True))
     if ES.step(train_losses['train'][epoch]):
         break
-    MC.step(train_losses['train'][epoch], epoch, model, optimizer, path)  # path
+    MC.step(train_losses[args.checkpoint_metric][epoch],
+            epoch,
+            model,
+            optimizer,
+            os.path.join(args.output_dir, 'model.pt'))
 
 
 # save training curves
