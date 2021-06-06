@@ -31,7 +31,7 @@ def compute_loss(output_x, true_x, output_v, true_v, output_age, true_age, outpu
     L_age = age_criterion(output_age.flatten(), true_age)
     L_sex = sex_criterion(output_sex.flatten(), true_sex)
     L_total = L_disease * loss_weights[0] + L_vol * loss_weights[1] + L_age * loss_weights[2] + L_sex * loss_weights[3]
-    return L_disease, L_vol, L_age, L_total
+    return L_disease, L_vol, L_age, L_sex, L_total
 
 
 def train(epoch, model, optimizer_, loader, loss_weights=(1., 1., 1., 1.), to_cuda=True):
@@ -71,7 +71,7 @@ def train(epoch, model, optimizer_, loader, loss_weights=(1., 1., 1., 1.), to_cu
                               loss_weights)
 
         # update current losses
-        train_loss += losses[-1].item()
+        train_loss += losses[4].item()
         L_disease += losses[0].item()
         L_vol += losses[1].item()
         L_age += losses[2].item()
@@ -135,7 +135,7 @@ def test(model, loader, loss_weights=(1., 1., 1., 1.), to_cuda=True):
                                   loss_weights)
 
             # update current losses
-            test_loss += losses[-1].item()
+            test_loss += losses[4].item()
             L_disease += losses[0].item()
             L_vol += losses[1].item()
             L_age += losses[2].item()
