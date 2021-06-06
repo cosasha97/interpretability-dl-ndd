@@ -105,7 +105,7 @@ def train(epoch, model, optimizer_, loader, loss_weights=(1., 1., 1., 1.), to_cu
     return losses
 
 
-def test(model, loader, to_cuda=True):
+def test(model, loader, loss_weights=(1., 1., 1., 1.), to_cuda=True):
     """
     Test a trained model
 
@@ -131,7 +131,8 @@ def test(model, loader, to_cuda=True):
             losses = compute_loss(disease.float(), data['label'].float(),
                                   volumes.float(), data['volumes'].float(),
                                   age.float(), data['age'].float(),
-                                  sex.float(), data['sex'].float())
+                                  sex.float(), data['sex'].float(),
+                                  loss_weights)
 
             # update current losses
             test_loss += losses[-1].item()
