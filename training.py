@@ -131,8 +131,8 @@ print("Beginning of the training")
 
 # training
 for epoch in range(args.nb_epochs):
-    update_dict(train_losses, train(epoch, model, optimizer, train_loader, loss_weights=args.loss_weight, to_cuda=True))
-    update_dict(test_losses, test(model, valid_loader, loss_weights=args.loss_weight, to_cuda=True))
+    update_dict(train_losses, train(epoch, model, optimizer, train_loader, loss_weights=args.loss_weights, to_cuda=True))
+    update_dict(test_losses, test(model, valid_loader, loss_weights=args.loss_weights, to_cuda=True))
     if ES.step(train_losses[args.monitor][epoch]):
         break
     MC.step(train_losses[args.monitor][epoch],
