@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.ndimage import zoom
+from tools.settings import *
 
 
 class CamExtractor():
@@ -51,8 +52,8 @@ class CamExtractor():
             x = getattr(self.model, branch)(x)
         else:
             for k, (module_pos, module) in enumerate(getattr(self.model, branch)._modules.items()):
+                # do not apply again last convolution
                 if k != 0:
-                    # do not apply again last convolution
                     x = module(x)  # Forward
         return conv_output, x
 
@@ -72,13 +73,21 @@ class GradCam():
         else:
             self.null_scalar = torch.FloatTensor((1,)).fill_(0.)
 
-    def generate_cam(self, input_image, branch='branch1', resize=False, to_cpu=False):
+    def generate_cam(self, input_image, branch: string = None, target: string = None, resize=False, to_cpu=False):
         """
         Args:
             input_image: array
             branch: string, name of the branch
-            resize: bool, if True, resize attention maps to input_image shape
+            target: string, target name
+            resize: bool. if True, resize attention maps to input_image shape
+            to_cpu: bool. If True, moves cam to cpu
         """
+        if branch is None:
+            if target is None:
+                raise Exception("branch and target can not be both None")
+            else:
+                branch = TARGET2BRANCH[target]
+
         while len(input_image.shape) < 5:
             input_image = input_image[None, ...]
         # Full forward pass
@@ -126,4 +135,3 @@ class GradCam():
         for branch in branches:
             cams[branch] = self.generate_cam(input_image, branch=branch, resize=resize, to_cpu=to_cpu)
         return cams
-
