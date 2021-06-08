@@ -73,7 +73,13 @@ class GradCam():
         else:
             self.null_scalar = torch.FloatTensor((1,)).fill_(0.)
 
-    def generate_cam(self, input_image, branch: string = None, target: string = None, resize=False, to_cpu=False):
+    def generate_cam(self,
+                     input_image,
+                     branch: str = None,
+                     target: str = None,
+                     resize=False,
+                     to_cpu=False,
+                     volume_index: int = None):
         """
         Args:
             input_image: array
@@ -81,6 +87,7 @@ class GradCam():
             target: string, target name
             resize: bool. if True, resize attention maps to input_image shape
             to_cpu: bool. If True, moves cam to cpu
+            volume_index: int. Index of the volume of interest
         """
         if branch is None:
             if target is None:
@@ -100,7 +107,13 @@ class GradCam():
         self.model.features.zero_grad()
         getattr(self.model, branch).zero_grad()
         # Backward pass with specified target
-        model_output.sum().backward(retain_graph=True)
+        if BRANCH2TARGET[branch] == 'volumes' and volume_index is not None:
+            # apply mask to target a specific volume
+            mask_volumes = torch.zeros_like(model_output)
+            mask_volumes[:, volume_index] = 1
+            (model_output * mask_volumes).sum().backward(retain_graph=True)
+        else:
+            model_output.sum().backward(retain_graph=True)
         # Get hooked gradients
         guided_gradients = self.extractor.gradients.data[0]
         # Get convolution outputs
@@ -118,7 +131,11 @@ class GradCam():
             cam = cam.cpu()
         return cam
 
-    def get_explanations(self, input_image, resize=False, to_cpu=False):
+    def get_explanations(self,
+                         input_image,
+                         resize=False,
+                         to_cpu=False,
+                         volume_index: int = None):
         """
         Generate Grad-CAM attention maps for all branches.
         Args:
@@ -126,6 +143,7 @@ class GradCam():
                 (batch size dimension included) with dim 1 are also accepted.
             resize: bool, if True, resize attention maps to input_image shape
             to_cpu: bool, if True, explanation maps are moved to cpu
+            volume_index: int. Index of the volume of interest
         """
         if torch.cuda.is_available():
             input_image = input_image.cuda()
@@ -133,5 +151,9 @@ class GradCam():
         cams = {}
         branches = ['branch' + str(k) for k in range(1, 5)]
         for branch in branches:
-            cams[branch] = self.generate_cam(input_image, branch=branch, resize=resize, to_cpu=to_cpu)
+            cams[branch] = self.generate_cam(input_image,
+                                             branch=branch,
+                                             resize=resize,
+                                             to_cpu=to_cpu,
+                                             volume_index=volume_index)
         return cams

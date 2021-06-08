@@ -115,7 +115,7 @@ model = Net(sample, [8, 16, 32, 64, 128], args.dropout)
 if torch.cuda.is_available():
     print("To cuda")
     model.cuda()
-model.summary(batch_size=args.batch_size)
+# model.summary(batch_size=args.batch_size)
 
 # optimizer
 optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
@@ -150,3 +150,5 @@ def save_loss(loss, name="loss"):
 
 save_loss(train_losses, os.path.join(args.output_dir, 'train_losses'))
 save_loss(test_losses, os.path.join(args.output_dir, 'val_losses'))
+# gradients
+save_loss({'gradient_norms': model.gradient_norms}, os.path.join(args.output_dir, 'gradients'))

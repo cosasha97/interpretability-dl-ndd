@@ -16,6 +16,9 @@ class Net(nn.Module):
         in_channels = self.image_size[0]
         d_h_w = self.image_size[1:]
 
+        # recorded gradient norms
+        self.gradient_norms = []
+
         # default parameters
         kernel_size = 3
         self.dropout = dropout
@@ -147,8 +150,17 @@ class Net(nn.Module):
         else:
             raise Exception('Bad input type.')
 
+    def record_gradients(self, grad_norm):
+        """
+        Record norm of gradients at the end of self.features.
+        """
+        print('GRADIENT ', torch.linalg.norm(grad_norm).item())
+        self.gradient_norms.append(grad_norm)
+
     def forward(self, data, compute_metrics=False):
         x = self.features(self.format_input(data))
+        if x.requires_grad:
+            x.register_hook(self.record_gradients)
         disease = self.branch1(x)
         volumes = self.branch2(x)
         age = self.branch3(x)
