@@ -4,13 +4,17 @@ import pandas as pd
 from os import path
 
 # clinicaDL
-from clinicadl.tools.deep_learning.data import generate_sampler, return_dataset, MRIDataset, MRIDatasetImage, MRIDatasetSlice, get_transforms
+from clinicadl.tools.deep_learning.data import generate_sampler, return_dataset, MRIDataset, MRIDatasetImage, \
+    MRIDatasetSlice, get_transforms
 
 
 def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2'):
     """
     Fetch additional data: age, sex and volumes.
     Normalize scalar data.
+
+    Args:
+        training_data: DataFrame, with (at least) the following keys: participant_id, session_id, diagnosis, age, sex
     """
     # paths
     data_path = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021.tsv'
@@ -28,16 +32,17 @@ def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2'):
     add_indexes = [df_data.columns.get_loc(col_name) for col_name in col_names]
 
     # compute df_add_data
-    df_add_data = pd.read_csv(data_path, sep='\t', usecols=np.hstack([add_indexes, \
+    df_add_data = pd.read_csv(data_path, sep='\t', usecols=np.hstack([add_indexes,
                                                                       np.arange(first_column_index,
                                                                                 last_column_index + 1)]).flatten()).dropna(
         axis=1, how='all')
 
-    # normalization
+    ## normalization using only statistics from training data
     temp_df = pd.merge(training_data[['participant_id', 'session_id']],
                        df_add_data, on=['participant_id', 'session_id'], how='left')
     scalar_cols = temp_df.columns.difference(['participant_id', 'session_id', 'sex'])
-    df_add_data[scalar_cols] = (df_add_data[scalar_cols] - temp_df.mean()) / temp_df.std()
+    # df_add_data[scalar_cols] contains only scalar columns with (patient, session) from training set
+    df_add_data[scalar_cols] = (df_add_data[scalar_cols] - temp_df[scalar_cols].mean()) / temp_df[scalar_cols].std()
 
     return df_add_data
 

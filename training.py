@@ -16,12 +16,15 @@ from tools.models.CN5_FC3_3D import *
 from tools.callbacks import *
 from tools.data import *
 from train.train_CNN import *
-from tools.logger import  *
+from tools.logger import *
 
 # parser
 parser = argparse.ArgumentParser(description='Train 4-branch CNN')
 parser.add_argument('--name', type=str, default=None,
-                    help='Name of the job')
+                    help="""Name of the job. In case it is the same name as an an already existing job:
+                    - erase and restard from scratch if resume_training is False
+                    - resume training if resume_training is True
+                    """)
 parser.add_argument('--output_dir', type=str, default='results/models',
                     help='path to store training results (model, optimizer, losses, metrics)')
 parser.add_argument('-d', '--dropout', type=float, default=0.2,
@@ -40,7 +43,10 @@ parser.add_argument('--monitor', type=str, default='train',
                     help='metric used to monitor progress during training')
 parser.add_argument('-lw', '--loss_weights', nargs='+', type=float, default=[1., 1., 1., 1.],
                     help='weights to assign to each branch loss')
-
+parser.add_argument('--patience', type=int, default=10,
+                    help='patience of Early Stopping')
+parser.add_argument("--resume_training", type=str2bool, nargs='?', action='store_true', default=False,
+                    help="Load pretrained model and resume training.")
 
 args = parser.parse_args()
 
@@ -115,24 +121,31 @@ model = Net(sample, [8, 16, 32, 64, 128], args.dropout)
 if torch.cuda.is_available():
     print("To cuda")
     model.cuda()
-# model.summary(batch_size=args.batch_size)
+model.summary(batch_size=args.batch_size)
 
 # optimizer
 optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 # record losses
 train_losses = dict()
-test_losses = dict()
+val_losses = dict()
+
+# resume training ?
+if args.resume_training:
+    saved_data = torch.load('results/models/{}/best_model.pt'.format(args.name))
+    model.load_state_dict(saved_data['model_state_dict'])
+    train_losses = saved_data.train_losses
 
 # callbacks
-ES = EarlyStopping(patience=5)
+ES = EarlyStopping(patience=args.patience)
 MC = ModelCheckpoint()
 
 print("Beginning of the training")
 
 # training
 for epoch in range(args.nb_epochs):
-    update_dict(train_losses, train(epoch, model, optimizer, train_loader, loss_weights=args.loss_weights, to_cuda=True))
-    update_dict(test_losses, test(model, valid_loader, loss_weights=args.loss_weights, to_cuda=True))
+    update_dict(train_losses,
+                train(epoch, model, optimizer, train_loader, loss_weights=args.loss_weights, to_cuda=True))
+    update_dict(val_losses, test(model, valid_loader, loss_weights=args.loss_weights, to_cuda=True))
     if ES.step(train_losses[args.monitor][epoch]):
         break
     MC.step(train_losses[args.monitor][epoch],
@@ -149,6 +162,6 @@ def save_loss(loss, name="loss"):
 
 
 save_loss(train_losses, os.path.join(args.output_dir, 'train_losses'))
-save_loss(test_losses, os.path.join(args.output_dir, 'val_losses'))
+save_loss(val_losses, os.path.join(args.output_dir, 'val_losses'))
 # gradients
-save_loss({'gradient_norms': model.gradient_norms}, os.path.join(args.output_dir, 'gradients'))
+# save_loss({'gradient_norms': model.gradient_norms}, os.path.join(args.output_dir, 'gradients'))

@@ -10,20 +10,31 @@ class ModelCheckpoint(object):
         self.is_better = None
         self._init_is_better(mode, min_delta)
 
-    def step(self, metrics, epoch, model, optimizer, path=""):
+    def step(self, metric, epoch, model, optimizer, train_metrics=None, val_metrics=None, path=""):
+        """
+        Monitor progress and save data if necessary.
+
+        :param metric: float, value of the metric used to monitor progress
+        :param epoch: int, current epoch
+        :param model: pytorch model
+        :param optimizer: pytorch optimizer
+        :param train_metrics: dict of lists (evolution of the metrics on training set during model training)
+        :param val_metrics: dict of lists (evolution of the metrics on validation set during model training)
+        :param path: string, directory path where data will be stored
+        """
         import numpy as np
 
         if self.best is None:
-            self.best = metrics
-            self.save_model(metrics, epoch, model, optimizer, path)
+            self.best = metric
+            self.save_model(metric, epoch, model, optimizer, train_metrics, val_metrics, path)
             return True
 
-        if np.isnan(metrics):
+        if np.isnan(metric):
             raise Exception("Metric is NaN")
 
-        if self.is_better(metrics, self.best):
-            self.best = metrics
-            self.save_model(metrics, epoch, model, optimizer, path)
+        if self.is_better(metric, self.best):
+            self.best = metric
+            self.save_model(metric, epoch, model, optimizer, path)
             return True
 
         return False
@@ -38,10 +49,12 @@ class ModelCheckpoint(object):
             self.is_better = lambda a, best: a > best + best * min_delta
 
     @staticmethod
-    def save_model(metrics, epoch, model, optimizer, path=""):
+    def save_model(metric, epoch, model, optimizer, train_metrics, val_metrics, path=""):
         torch.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
-            'loss': metrics,
+            'loss': metric,
+            'train_metrics': train_metrics,
+            'val_metrics': val_metrics,
         }, os.path.join(path, "best_model.pt"))
