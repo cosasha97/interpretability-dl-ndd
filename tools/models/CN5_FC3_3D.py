@@ -159,8 +159,8 @@ class Net(nn.Module):
 
     def forward(self, data, compute_metrics=False):
         x = self.features(self.format_input(data))
-        if x.requires_grad:
-            x.register_hook(self.record_gradients)
+#         if x.requires_grad:
+#             x.register_hook(self.record_gradients)
         disease = self.branch1(x)
         volumes = self.branch2(x)
         age = self.branch3(x)

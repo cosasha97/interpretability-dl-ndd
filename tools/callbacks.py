@@ -34,7 +34,7 @@ class ModelCheckpoint(object):
 
         if self.is_better(metric, self.best):
             self.best = metric
-            self.save_model(metric, epoch, model, optimizer, path)
+            self.save_model(metric, epoch, model, optimizer, train_metrics, val_metrics, path)
             return True
 
         return False
@@ -50,6 +50,7 @@ class ModelCheckpoint(object):
 
     @staticmethod
     def save_model(metric, epoch, model, optimizer, train_metrics, val_metrics, path=""):
+        print('### ModelCheckpoint: saving model ###')
         torch.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),

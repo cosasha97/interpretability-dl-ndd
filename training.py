@@ -3,6 +3,7 @@ import os
 import argparse
 import re
 import logging
+import json
 
 # clinicaDL
 from clinicadl.tools.tsv.data_split import create_split
@@ -45,7 +46,7 @@ parser.add_argument('-lw', '--loss_weights', nargs='+', type=float, default=[1.,
                     help='weights to assign to each branch loss')
 parser.add_argument('--patience', type=int, default=10,
                     help='patience of Early Stopping')
-parser.add_argument("--resume_training", type=str2bool, nargs='?', action='store_true', default=False,
+parser.add_argument("--resume_training", action='store_true', default=False,
                     help="Load pretrained model and resume training.")
 
 args = parser.parse_args()
@@ -64,9 +65,19 @@ if args.name is None:
 args.output_dir = os.path.join(args.output_dir, args.name)
 # configure logger
 stdout_logger = config_logger(args.output_dir)
-# save commandline
-commandline_to_json(args, logger=stdout_logger)
 
+# resume training ?
+if args.resume_training:
+    # resume training
+    with open(os.path.join(args.output_dir, 'commandline.json'), "r") as f:
+        json_data = json.load(f)
+    for key in json_data:
+        setattr(args, key, json_data[key])
+else:
+    # save commandline
+    commandline_to_json(args, logger=stdout_logger)
+
+print(args)
 print("Beginning of the script - TRAINING")
 
 # load dataframes
@@ -125,33 +136,48 @@ model.summary(batch_size=args.batch_size)
 
 # optimizer
 optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
-# record losses
-train_losses = dict()
-val_losses = dict()
-
-# resume training ?
-if args.resume_training:
-    saved_data = torch.load('results/models/{}/best_model.pt'.format(args.name))
-    model.load_state_dict(saved_data['model_state_dict'])
-    train_losses = saved_data.train_losses
 
 # callbacks
 ES = EarlyStopping(patience=args.patience)
 MC = ModelCheckpoint()
 
-print("Beginning of the training")
+# record losses
+train_metrics = dict()
+val_metrics = dict()
+
+if args.resume_training:
+    # resume training
+    print("###### Resume training ######")
+    checkpoint = torch.load('results/models/{}/best_model.pt'.format(args.name))
+    first_epoch = checkpoint['epoch'] + 1
+    print('starting epoch: %d' % first_epoch)
+    MC.best = checkpoint['loss']
+    if 'train_metrics' in checkpoint.keys():
+        train_metrics = checkpoint['train_metrics']
+    if 'val_metrics' in checkpoint.keys():
+        val_metrics = checkpoint['val_metrics']
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+else:
+    # start a new training
+    print("###### Start training ######")
+    # first epoch
+    first_epoch = 0
 
 # training
-for epoch in range(args.nb_epochs):
-    update_dict(train_losses,
+for epoch in range(first_epoch, args.nb_epochs):
+    update_dict(train_metrics,
                 train(epoch, model, optimizer, train_loader, loss_weights=args.loss_weights, to_cuda=True))
-    update_dict(val_losses, test(model, valid_loader, loss_weights=args.loss_weights, to_cuda=True))
-    if ES.step(train_losses[args.monitor][epoch]):
+    update_dict(val_metrics, test(model, valid_loader, loss_weights=args.loss_weights, to_cuda=True))
+    if ES.step(train_metrics[args.monitor][-1]):
         break
-    MC.step(train_losses[args.monitor][epoch],
+    MC.step(train_metrics[args.monitor][-1],
             epoch,
             model,
             optimizer,
+            train_metrics,
+            val_metrics,
             args.output_dir)
 
 
@@ -161,7 +187,7 @@ def save_loss(loss, name="loss"):
     df[df.any(axis=1)].to_csv(name + '.csv', index=False)
 
 
-save_loss(train_losses, os.path.join(args.output_dir, 'train_losses'))
-save_loss(val_losses, os.path.join(args.output_dir, 'val_losses'))
+save_loss(train_metrics, os.path.join(args.output_dir, 'train_metrics'))
+save_loss(val_metrics, os.path.join(args.output_dir, 'val_metrics'))
 # gradients
 # save_loss({'gradient_norms': model.gradient_norms}, os.path.join(args.output_dir, 'gradients'))
