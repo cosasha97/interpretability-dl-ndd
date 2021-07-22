@@ -167,7 +167,7 @@ optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
 # callbacks
 ES = EarlyStopping(patience=args.patience)
-MC = ModelCheckpoint()
+MC = ModelCheckpoint(save_last_model=True)
 
 # record losses
 train_metrics = dict()
