@@ -54,7 +54,6 @@ parser.add_argument('--config_path', type=str, default=None,
 parser.add_argument('--debug', action='store_true', default=False,
                     help="Launch debug model (use a small size dataset).")
 
-
 args = parser.parse_args()
 
 # load existing config
@@ -82,6 +81,7 @@ stdout_logger = config_logger(args.output_dir)
 # resume training ?
 if args.resume_training:
     # RESUME TRAINING
+    print("RESUME TRAINING")
     with open(os.path.join(args.output_dir, 'commandline.json'), "r") as f:
         json_data = json.load(f)
     for key in json_data:
@@ -93,6 +93,7 @@ if args.resume_training:
 
 else:
     # NEW TRAINING
+    print("NEW TRAINING")
     # save commandline
     commandline_to_json(args, logger=stdout_logger)
 
@@ -111,16 +112,16 @@ else:
     valid_df = valid_df.append(df_CN[1]).reset_index()
     # for debug
     if args.debug:
-        training_df = training_df.iloc[np.array([0,1,2,-1,-2,-3])]
-        valid_df = valid_df.iloc[np.array([0,1,2,-1,-2,-3])]
+        training_df = training_df.iloc[np.array([0, 1, 2, -1, -2, -3])].reset_index()
+        valid_df = valid_df.iloc[np.array([0, 1, 2, -1, -2, -3])].reset_index()
 
     # drop index column
     training_df.drop(columns=['index'], inplace=True)
     valid_df.drop(columns=['index'], inplace=True)
 
     # save split
-    training_df.to_csv('training.csv', index=False)
-    valid_df.to_csv('valid_df.csv', index=False)
+    training_df.to_csv(os.path.join(args.output_dir, 'training_df.csv'), index=False)
+    valid_df.to_csv(os.path.join(args.output_dir, 'valid_df.csv'), index=False)
 
 print(args)
 print("Beginning of the script - TRAINING")
