@@ -149,8 +149,7 @@ class GradCam():
             input_image = input_image.cuda()
         # grad-cam attention maps
         cams = {}
-        branches = ['branch' + str(k) for k in range(1, 5)]
-        for branch in branches:
+        for branch in BRANCH2TARGET.keys():
             cams[branch] = self.generate_cam(input_image,
                                              branch=branch,
                                              resize=resize,
