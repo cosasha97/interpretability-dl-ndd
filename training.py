@@ -74,30 +74,35 @@ if args.resume_training:
         json_data = json.load(f)
     for key in json_data:
         setattr(args, key, json_data[key])
+
+    # load data split
+    training_df = pd.read_csv(os.path.join(args.output_dir, 'training_df.csv'))
+    valid_df = pd.read_csv(os.path.join(args.output_dir, 'valid_df.csv'))
+
 else:
     # save commandline
     commandline_to_json(args, logger=stdout_logger)
 
+    # load dataframes
+    AD = pd.read_csv('subjects/AD.tsv', sep='\t')
+    CN = pd.read_csv('subjects/CN.tsv', sep='\t')
+
+    # remove samples with NaN
+    AD.drop(AD[AD.isna().sum(axis=1) > 0].index, inplace=True)
+    CN.drop(CN[CN.isna().sum(axis=1) > 0].index, inplace=True)
+
+    # split data between training and validation sets
+    training_df, valid_df = create_split('AD', AD, 'diagnosis', 0.2)
+    df_CN = create_split('CN', CN, 'diagnosis', 0.2)
+    training_df = training_df.append(df_CN[0]).reset_index()  # .iloc[np.array([0,1,2,-1,-2,-3])]
+    valid_df = valid_df.append(df_CN[1]).reset_index()  # .iloc[np.array([0,1,2,-1,-2,-3])]
+
+    # drop index column
+    training_df.drop(columns=['index'], inplace=True)
+    valid_df.drop(columns=['index'], inplace=True)
+
 print(args)
 print("Beginning of the script - TRAINING")
-
-# load dataframes
-AD = pd.read_csv('subjects/AD.tsv', sep='\t')
-CN = pd.read_csv('subjects/CN.tsv', sep='\t')
-
-# remove samples with NaN
-AD.drop(AD[AD.isna().sum(axis=1) > 0].index, inplace=True)
-CN.drop(CN[CN.isna().sum(axis=1) > 0].index, inplace=True)
-
-# split data between training and validation sets
-training_df, valid_df = create_split('AD', AD, 'diagnosis', 0.2)
-df_CN = create_split('CN', CN, 'diagnosis', 0.2)
-training_df = training_df.append(df_CN[0]).reset_index()  # .iloc[np.array([0,1,2,-1,-2,-3])]
-valid_df = valid_df.append(df_CN[1]).reset_index()  # .iloc[np.array([0,1,2,-1,-2,-3])]
-
-# drop index column
-training_df.drop(columns=['index'], inplace=True)
-valid_df.drop(columns=['index'], inplace=True)
 
 train_transforms, all_transforms = get_transforms('image', minmaxnormalization=True, data_augmentation=None)
 # fetch volumetric data
