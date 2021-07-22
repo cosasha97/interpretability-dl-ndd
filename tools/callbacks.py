@@ -1,13 +1,22 @@
 import torch
 import os
+import numpy as np
 
 
 class ModelCheckpoint(object):
-    def __init__(self, mode='min', min_delta=0):
+    def __init__(self, mode='min', min_delta=0, save_last_model=False):
+        """
+        Save checkpoint of the model state, optimizer parameters, metrics, loss and epoch values.
+
+        :param mode: string
+        :param min_delta: float
+        :param save_last_model: bool. If True, automatically save model at each iteration under 'last_model'.
+        """
         self.mode = mode
         self.min_delta = min_delta
         self.best = None
         self.is_better = None
+        self.save_last_model = False
         self._init_is_better(mode, min_delta)
 
     def step(self, metric, epoch, model, optimizer, train_metrics=None, val_metrics=None, path=""):
@@ -22,7 +31,9 @@ class ModelCheckpoint(object):
         :param val_metrics: dict of lists (evolution of the metrics on validation set during model training)
         :param path: string, directory path where data will be stored
         """
-        import numpy as np
+        # default: save model in last_model.pt
+        if self.save_last_model:
+            self.save_model(metric, epoch, model, optimizer, train_metrics, val_metrics, path, "last_model.pt")
 
         if self.best is None:
             self.best = metric
@@ -49,8 +60,8 @@ class ModelCheckpoint(object):
             self.is_better = lambda a, best: a > best + best * min_delta
 
     @staticmethod
-    def save_model(metric, epoch, model, optimizer, train_metrics, val_metrics, path=""):
-        print('### ModelCheckpoint: saving model ###')
+    def save_model(metric, epoch, model, optimizer, train_metrics, val_metrics, path="", name="best_model.pt"):
+        print('### ModelCheckpoint: saving model {} ###'.format(name))
         torch.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
@@ -58,4 +69,4 @@ class ModelCheckpoint(object):
             'loss': metric,
             'train_metrics': train_metrics,
             'val_metrics': val_metrics,
-        }, os.path.join(path, "best_model.pt"))
+        }, os.path.join(path, name))
