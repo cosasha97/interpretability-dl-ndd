@@ -59,14 +59,14 @@ class ModelCheckpoint(object):
         if mode == 'max':
             self.is_better = lambda a, best: a > best + best * min_delta
 
-    @staticmethod
-    def save_model(metric, epoch, model, optimizer, train_metrics, val_metrics, path="", name="best_model.pt"):
+    def save_model(self, metric, epoch, model, optimizer, train_metrics, val_metrics, path="", name="best_model.pt"):
         print('### ModelCheckpoint: saving model {} ###'.format(name))
         torch.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': metric,
+            'best_loss': self.best,  # same as loss when best_model is saved
             'train_metrics': train_metrics,
             'val_metrics': val_metrics,
         }, os.path.join(path, name))

@@ -49,8 +49,18 @@ parser.add_argument('--patience', type=int, default=10,
                     help='patience of Early Stopping')
 parser.add_argument("--resume_training", action='store_true', default=False,
                     help="Load pretrained model and resume training.")
+parser.add_argument('--config_path', type=str, default=None,
+                    help="""Path to configuration. """)
+
 
 args = parser.parse_args()
+
+# load existing config
+if args.config_path is not None:
+    with open(args.config_path, "r") as f:
+        json_data = json.load(f)
+    for key in json_data:
+        setattr(args, key, json_data[key])
 
 # paths
 caps_directory = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021/'
@@ -69,7 +79,7 @@ stdout_logger = config_logger(args.output_dir)
 
 # resume training ?
 if args.resume_training:
-    # resume training
+    # RESUME TRAINING
     with open(os.path.join(args.output_dir, 'commandline.json'), "r") as f:
         json_data = json.load(f)
     for key in json_data:
@@ -80,6 +90,7 @@ if args.resume_training:
     valid_df = pd.read_csv(os.path.join(args.output_dir, 'valid_df.csv'))
 
 else:
+    # NEW TRAINING
     # save commandline
     commandline_to_json(args, logger=stdout_logger)
 
@@ -154,16 +165,16 @@ val_metrics = dict()
 if args.resume_training:
     # resume training
     print("###### Resume training ######")
-    checkpoint = torch.load('results/models/{}/best_model.pt'.format(args.name))
-    first_epoch = checkpoint['epoch'] + 1
+    last_checkpoint = torch.load('results/models/{}/last_model.pt'.format(args.name))
+    first_epoch = last_checkpoint['epoch'] + 1
     print('starting epoch: %d' % first_epoch)
-    MC.best = checkpoint['loss']
-    if 'train_metrics' in checkpoint.keys():
-        train_metrics = checkpoint['train_metrics']
-    if 'val_metrics' in checkpoint.keys():
-        val_metrics = checkpoint['val_metrics']
-    model.load_state_dict(checkpoint['model_state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    MC.best = last_checkpoint['loss']
+    if 'train_metrics' in last_checkpoint.keys():
+        train_metrics = last_checkpoint['train_metrics']
+    if 'val_metrics' in last_checkpoint.keys():
+        val_metrics = last_checkpoint['val_metrics']
+    model.load_state_dict(last_checkpoint['model_state_dict'])
+    optimizer.load_state_dict(last_checkpoint['optimizer_state_dict'])
 
 else:
     # start a new training
