@@ -51,6 +51,8 @@ parser.add_argument("--resume_training", action='store_true', default=False,
                     help="Load pretrained model and resume training.")
 parser.add_argument('--config_path', type=str, default=None,
                     help="""Path to configuration. """)
+parser.add_argument('--debug', action='store_true', default=False,
+                    help="Launch debug model (use a small size dataset).")
 
 
 args = parser.parse_args()
@@ -105,8 +107,12 @@ else:
     # split data between training and validation sets
     training_df, valid_df = create_split('AD', AD, 'diagnosis', 0.2)
     df_CN = create_split('CN', CN, 'diagnosis', 0.2)
-    training_df = training_df.append(df_CN[0]).reset_index()  # .iloc[np.array([0,1,2,-1,-2,-3])]
-    valid_df = valid_df.append(df_CN[1]).reset_index()  # .iloc[np.array([0,1,2,-1,-2,-3])]
+    training_df = training_df.append(df_CN[0]).reset_index()
+    valid_df = valid_df.append(df_CN[1]).reset_index()
+    # for debug
+    if args.debug:
+        training_df = training_df.iloc[np.array([0,1,2,-1,-2,-3])]
+        valid_df = valid_df.iloc[np.array([0,1,2,-1,-2,-3])]
 
     # drop index column
     training_df.drop(columns=['index'], inplace=True)
