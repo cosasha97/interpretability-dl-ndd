@@ -112,6 +112,10 @@ else:
     training_df.drop(columns=['index'], inplace=True)
     valid_df.drop(columns=['index'], inplace=True)
 
+    # save split
+    training_df.to_csv('training.csv', index=False)
+    valid_df.to_csv('valid_df.csv', index=False)
+
 print(args)
 print("Beginning of the script - TRAINING")
 
