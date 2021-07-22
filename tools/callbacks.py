@@ -16,7 +16,7 @@ class ModelCheckpoint(object):
         self.min_delta = min_delta
         self.best = None
         self.is_better = None
-        self.save_last_model = False
+        self.save_last_model = save_last_model
         self._init_is_better(mode, min_delta)
 
     def step(self, metric, epoch, model, optimizer, train_metrics=None, val_metrics=None, path=""):

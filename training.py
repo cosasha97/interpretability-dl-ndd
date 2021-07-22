@@ -108,14 +108,17 @@ else:
     # split data between training and validation sets
     training_df, valid_df = create_split('AD', AD, 'diagnosis', 0.2)
     df_CN = create_split('CN', CN, 'diagnosis', 0.2)
-    training_df = training_df.append(df_CN[0]).reset_index()
-    valid_df = valid_df.append(df_CN[1]).reset_index()
+    training_df = training_df.append(df_CN[0])
+    valid_df = valid_df.append(df_CN[1])
+
     # for debug
     if args.debug:
-        training_df = training_df.iloc[np.array([0, 1, 2, -1, -2, -3])].reset_index()
-        valid_df = valid_df.iloc[np.array([0, 1, 2, -1, -2, -3])].reset_index()
+        training_df = training_df.iloc[np.array([0, 1, 2, -1, -2, -3])]
+        valid_df = valid_df.iloc[np.array([0, 1, 2, -1, -2, -3])]
 
     # drop index column
+    training_df = training_df.reset_index()
+    valid_df = valid_df.reset_index()
     training_df.drop(columns=['index'], inplace=True)
     valid_df.drop(columns=['index'], inplace=True)
 
