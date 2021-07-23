@@ -2,7 +2,7 @@ import numpy as np
 from math import floor
 import torch
 from torchinfo import summary
-from torchmetrics import Accuracy, Recall, Precision, MetricCollection, MeanSquaredError, R2Score
+from torchmetrics import Accuracy, Recall, Precision, MetricCollection, MeanSquaredError, R2Score, AUROC, F1
 
 # torch
 import torch.nn as nn
@@ -46,7 +46,7 @@ class Net(nn.Module):
 
         ## volumes
         prefix = 'b2-'
-        n_volumes = np.prod(sample['volumes'].shape)
+        n_volumes = np.prod(sample['volumes'].shape).item()
         self.branch2 = nn.Sequential()
         # add convolutional unit
         _ = self.add_conv_unit(self.branch2, in_channels, convolutions[-1],
@@ -78,10 +78,12 @@ class Net(nn.Module):
         self.branch4.add_module(prefix + "sigmoid", nn.Sigmoid())
 
         # metrics
-        self.b1_metrics = MetricCollection([Accuracy(), Recall(), Precision()])
-        self.b2_metrics = MetricCollection([R2Score(num_outputs=n_volumes, multioutput='uniform_average')])
-        self.b3_metrics = MetricCollection([R2Score(num_outputs=n_volumes, multioutput='uniform_average')])
-        self.b4_metrics = MetricCollection([Accuracy(), Recall(), Precision()])
+        self.b1_metrics = MetricCollection([Accuracy(), F1(), AUROC()])
+        self.b2_metrics = MetricCollection([MeanSquaredError(squared=False),
+                                            R2Score(num_outputs=n_volumes, multioutput='uniform_average')])
+        # self.b3_metrics = MetricCollection([R2Score(num_outputs=n_volumes, multioutput='uniform_average')])
+        self.b3_metrics = MetricCollection([MeanSquaredError(squared=False), R2Score()])
+        self.b4_metrics = MetricCollection([Accuracy(), F1(), AUROC()])
 
     @staticmethod
     def conv_output_shape(d_h_w, kernel_size=1, stride=1, pad=0, dilation=1):
@@ -157,7 +159,17 @@ class Net(nn.Module):
         print('GRADIENT ', torch.linalg.norm(grad_norm).item())
         self.gradient_norms.append(grad_norm)
 
-    def forward(self, data, compute_metrics=False):
+    def forward(self, data, compute_metrics=False, rescaling=None):
+        """
+        Forward pass. Compute metrics if compute_metrics is True.
+
+        :param data: tensor, input features
+        :param compute_metrics: bool,
+        :param rescaling: parameters used to rescale normalized values (for regression). In practice, it
+        may be used for age and volumes.
+
+        :return : loss for each branch
+        """
         x = self.features(self.format_input(data))
 #         if x.requires_grad:
 #             x.register_hook(self.record_gradients)

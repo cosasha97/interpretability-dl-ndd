@@ -131,7 +131,7 @@ print("Beginning of the script - TRAINING")
 
 train_transforms, all_transforms = get_transforms('image', minmaxnormalization=True, data_augmentation=None)
 # fetch volumetric data
-df_add_data = fetch_add_data(training_df)
+stds, df_add_data = fetch_add_data(training_df)
 
 # all_transforms = torchvision.transforms.Compose([])
 

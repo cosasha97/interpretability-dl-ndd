@@ -15,6 +15,10 @@ def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2'):
 
     Args:
         training_data: DataFrame, with (at least) the following keys: participant_id, session_id, diagnosis, age, sex
+
+    Return:
+        - stds: pandas.core.series.Series. Stds used to normalized scalar features.
+        - df_add_data: DataFrame containing the normalized additional data
     """
     # paths
     data_path = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021.tsv'
@@ -37,14 +41,15 @@ def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2'):
                                                                                 last_column_index + 1)]).flatten()).dropna(
         axis=1, how='all')
 
-    ## normalization using only statistics from training data
+    # normalization using only statistics from training data
     temp_df = pd.merge(training_data[['participant_id', 'session_id']],
                        df_add_data, on=['participant_id', 'session_id'], how='left')
     scalar_cols = temp_df.columns.difference(['participant_id', 'session_id', 'sex'])
     # df_add_data[scalar_cols] contains only scalar columns with (patient, session) from training set
-    df_add_data[scalar_cols] = (df_add_data[scalar_cols] - temp_df[scalar_cols].mean()) / temp_df[scalar_cols].std()
+    means, stds = temp_df[scalar_cols].mean(), temp_df[scalar_cols].std()
+    df_add_data[scalar_cols] = (df_add_data[scalar_cols] - means) / stds
 
-    return df_add_data
+    return stds, df_add_data
 
 
 class MRIDatasetSlice(MRIDataset):
