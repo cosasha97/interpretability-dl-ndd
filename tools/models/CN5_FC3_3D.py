@@ -46,13 +46,13 @@ class Net(nn.Module):
 
         ## volumes
         prefix = 'b2-'
-        n_volumes = np.prod(sample['volumes'].shape).item()
+        self.n_volumes = np.prod(sample['volumes'].shape).item()
         self.branch2 = nn.Sequential()
         # add convolutional unit
         _ = self.add_conv_unit(self.branch2, in_channels, convolutions[-1],
                                kernel_size, d_h_w, prefix=prefix)
         # add dense unit
-        dense_features = [4 * n_volumes, 2 * n_volumes, n_volumes]
+        dense_features = [4 * self.n_volumes, 2 * self.n_volumes, self.n_volumes]
         self.add_dense_unit(self.branch2, self.features_output_size,
                             dense_features, prefix=prefix)
 
@@ -80,8 +80,8 @@ class Net(nn.Module):
         # metrics
         self.b1_metrics = MetricCollection([Accuracy(), F1(), AUROC()])
         self.b2_metrics = MetricCollection([MeanSquaredError(squared=False),
-                                            R2Score(num_outputs=n_volumes, multioutput='uniform_average')])
-        # self.b3_metrics = MetricCollection([R2Score(num_outputs=n_volumes, multioutput='uniform_average')])
+                                            R2Score(num_outputs=self.n_volumes, multioutput='uniform_average')])
+        # self.b3_metrics = MetricCollection([R2Score(num_outputs=self.n_volumes, multioutput='uniform_average')])
         self.b3_metrics = MetricCollection([MeanSquaredError(squared=False), R2Score()])
         self.b4_metrics = MetricCollection([Accuracy(), F1(), AUROC()])
 
@@ -179,9 +179,22 @@ class Net(nn.Module):
         sex = self.branch4(x)
 
         if compute_metrics:
+            # rescaling parameters
+            if rescaling is not None:
+                # volumes
+                columns = rescaling[rescaling.keys().difference(['age'])]
+                b2_scale = rescaling[columns].reshape((1, self.n_volumes))
+                # age
+                b3_scale = rescaling['age'].reshape((1, 1))
+            else:
+                # volumes
+                b2_scale = torch.ones((1, self.n_volumes))
+                # age
+                b3_scale = torch.ones((1, 1))
+            # compute metrics
             self.b1_metrics.update(disease.squeeze().detach(), data['label'].type(torch.int8).detach())
-            self.b2_metrics.update(volumes.detach(), data['volumes'].detach())
-            self.b3_metrics.update(age.squeeze().detach(), data['age'].detach())
+            self.b2_metrics.update(b2_scale*volumes.detach(), b2_scale*data['volumes'].detach())
+            self.b3_metrics.update(b3_scale*age.squeeze().detach(), b3_scale*data['age'].detach())
             self.b4_metrics.update(sex.squeeze().detach(), data['sex'].type(torch.int8).detach())
 
         return disease, volumes, age, sex
