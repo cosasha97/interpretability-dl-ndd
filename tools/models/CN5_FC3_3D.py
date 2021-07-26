@@ -193,8 +193,8 @@ class Net(nn.Module):
                 b3_scale = torch.ones((1, 1))
             # compute metrics
             self.b1_metrics.update(disease.squeeze().detach(), data['label'].type(torch.int8).detach())
-            self.b2_metrics.update(b2_scale*volumes.detach(), b2_scale*data['volumes'].detach())
-            self.b3_metrics.update(b3_scale*age.squeeze().detach(), b3_scale*data['age'].detach())
+            self.b2_metrics.update(b2_scale*volumes.detach().cpu(), b2_scale*data['volumes'].detach().cpu())
+            self.b3_metrics.update(b3_scale*age.squeeze().detach().cpu(), b3_scale*data['age'].detach().cpu())
             self.b4_metrics.update(sex.squeeze().detach(), data['sex'].type(torch.int8).detach())
 
         return disease, volumes, age, sex

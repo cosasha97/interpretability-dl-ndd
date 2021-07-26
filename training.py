@@ -5,6 +5,7 @@ import argparse
 import re
 import logging
 import json
+import random
 
 # clinicaDL
 from clinicadl.tools.tsv.data_split import create_split
@@ -19,6 +20,9 @@ from tools.callbacks import *
 from tools.data import *
 from train.train_CNN import *
 from tools.logger import *
+
+# debug
+import pdb
 
 # parser
 parser = argparse.ArgumentParser(description='Train 4-branch CNN')
@@ -53,6 +57,10 @@ parser.add_argument('--config_path', type=str, default=None,
                     help="""Path to configuration. """)
 parser.add_argument('--debug', action='store_true', default=False,
                     help="Launch debug model (use a small size dataset).")
+parser.add_argument('--seed', type=int, default=0,
+                    help='Seed for all the process.')
+parser.add_argument('--cpu', action='store_true', default=False,
+                    help="Run program on cpu.")
 
 args = parser.parse_args()
 
@@ -77,6 +85,11 @@ if args.name is None:
 args.output_dir = os.path.join(args.output_dir, args.name)
 # configure logger
 stdout_logger = config_logger(args.output_dir)
+
+# fix seeds
+torch.manual_seed(args.seed)  # pytorch
+random.seed(args.seed)
+np.random.seed(args.seed)
 
 # resume training ?
 if args.resume_training:
@@ -160,10 +173,25 @@ valid_loader = DataLoader(data_valid,
 sample = data_train[0]
 # build model
 model = Net(sample, [8, 16, 32, 64, 128], args.dropout)
-if torch.cuda.is_available():
+
+if args.cpu:
+    print("To CPU")
+    if next(model.parameters()).is_cuda:
+        # move model from GPU to CPU
+        print("Moving model from GPU to CPU")
+        model = model.cpu()
+elif torch.cuda.is_available() and not next(model.parameters()).is_cuda:
+    # move model from CPU to GPU
     print("To cuda")
-    model.cuda()
-model.summary(batch_size=args.batch_size)
+    model = model.cuda()
+else:
+    print("Model can not be moved to GPU.")
+
+if next(model.parameters()).is_cuda:
+    # summary automatically moves the model to GPU !!!
+    # avoid the call if model must be on CPU
+    model.summary(batch_size=args.batch_size)
+print('Is model on GPU?', next(model.parameters()).is_cuda)
 
 # optimizer
 optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
@@ -199,8 +227,18 @@ else:
 # training
 for epoch in range(first_epoch, args.nb_epochs):
     update_dict(train_metrics,
-                train(epoch, model, optimizer, train_loader, loss_weights=args.loss_weights, to_cuda=True))
-    update_dict(val_metrics, test(model, valid_loader, loss_weights=args.loss_weights, to_cuda=True))
+                train(epoch,
+                      model,
+                      optimizer, train_loader,
+                      loss_weights=args.loss_weights,
+                      to_cuda=not args.cpu,
+                      rescaling=stds))
+    update_dict(val_metrics,
+                test(model,
+                     valid_loader,
+                     loss_weights=args.loss_weights,
+                     to_cuda=not args.cpu,
+                     rescaling=stds))
     if ES.step(train_metrics[args.monitor][-1]):
         break
     MC.step(train_metrics[args.monitor][-1],
@@ -210,6 +248,7 @@ for epoch in range(first_epoch, args.nb_epochs):
             train_metrics,
             val_metrics,
             args.output_dir)
+    print(train_metrics)
 
 
 # save training curves

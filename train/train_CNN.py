@@ -34,7 +34,7 @@ def compute_loss(output_x, true_x, output_v, true_v, output_age, true_age, outpu
     return L_disease, L_vol, L_age, L_sex, L_total
 
 
-def train(epoch, model, optimizer_, loader, loss_weights=(1., 1., 1., 1.), to_cuda=True):
+def train(epoch, model, optimizer_, loader, loss_weights=(1., 1., 1., 1.), to_cuda=True, rescaling=None):
     """
     Training of multi-branch model
 
@@ -45,6 +45,7 @@ def train(epoch, model, optimizer_, loader, loss_weights=(1., 1., 1., 1.), to_cu
         loader: data loader
         loss_weights: list of float, weights to assign to each loss
         to_cuda: bool. If True, moves data to gpu.
+        rescaling: pandas Series containing scaling factor (useful for metrics computation)
     """
 
     model.reset_metrics()
@@ -63,7 +64,7 @@ def train(epoch, model, optimizer_, loader, loss_weights=(1., 1., 1., 1.), to_cu
         # zero the parameter gradients
         optimizer_.zero_grad()
         # forward
-        disease, volumes, age, sex = model(data, compute_metrics=True)
+        disease, volumes, age, sex = model(data) #, compute_metrics=True, rescaling=rescaling)
         losses = compute_loss(disease.float(), data['label'].float(),
                               volumes.float(), data['volumes'].float(),
                               age.float(), data['age'].float(),
@@ -105,7 +106,7 @@ def train(epoch, model, optimizer_, loader, loss_weights=(1., 1., 1., 1.), to_cu
     return losses
 
 
-def test(model, loader, loss_weights=(1., 1., 1., 1.), to_cuda=True):
+def test(model, loader, loss_weights=(1., 1., 1., 1.), to_cuda=True, rescaling=None):
     """
     Test a trained model
 
@@ -127,7 +128,7 @@ def test(model, loader, loss_weights=(1., 1., 1., 1.), to_cuda=True):
                         data[key] = data[key].cuda()
                     except AttributeError:
                         pass
-            disease, volumes, age, sex = model(data, compute_metrics=True)
+            disease, volumes, age, sex = model(data, compute_metrics=True, rescaling=rescaling)
             losses = compute_loss(disease.float(), data['label'].float(),
                                   volumes.float(), data['volumes'].float(),
                                   age.float(), data['age'].float(),
