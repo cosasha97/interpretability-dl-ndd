@@ -1,3 +1,5 @@
+import pdb
+
 import numpy as np
 from math import floor
 import torch
@@ -178,23 +180,29 @@ class Net(nn.Module):
         age = self.branch3(x)
         sex = self.branch4(x)
 
+        # compute metrics
+        cuda = next(self.parameters()).is_cuda
+
         if compute_metrics:
             # rescaling parameters
             if rescaling is not None:
                 # volumes
-                columns = rescaling[rescaling.keys().difference(['age'])]
-                b2_scale = rescaling[columns].reshape((1, self.n_volumes))
+                b2_scale = torch.tensor(rescaling[rescaling.keys().difference(['age'])].values[None, ...])
                 # age
-                b3_scale = rescaling['age'].reshape((1, 1))
+                b3_scale = torch.tensor(rescaling['age'].reshape(1))
             else:
                 # volumes
                 b2_scale = torch.ones((1, self.n_volumes))
                 # age
-                b3_scale = torch.ones((1, 1))
-            # compute metrics
+                b3_scale = torch.ones(1)
+            if cuda:
+                b2_scale = b2_scale.cuda()
+                b3_scale = b3_scale.cuda()
+
+            # computation
             self.b1_metrics.update(disease.squeeze().detach(), data['label'].type(torch.int8).detach())
-            self.b2_metrics.update(b2_scale*volumes.detach().cpu(), b2_scale*data['volumes'].detach().cpu())
-            self.b3_metrics.update(b3_scale*age.squeeze().detach().cpu(), b3_scale*data['age'].detach().cpu())
+            self.b2_metrics.update(b2_scale*volumes.detach(), b2_scale*data['volumes'].detach())
+            self.b3_metrics.update(b3_scale*age.squeeze().detach(), b3_scale*data['age'].detach())
             self.b4_metrics.update(sex.squeeze().detach(), data['sex'].type(torch.int8).detach())
 
         return disease, volumes, age, sex

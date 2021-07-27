@@ -4,13 +4,14 @@ import numpy as np
 
 
 class ModelCheckpoint(object):
-    def __init__(self, mode='min', min_delta=0, save_last_model=False):
+    def __init__(self, mode='min', min_delta=0, save_last_model=False, name="best_model.pt"):
         """
         Save checkpoint of the model state, optimizer parameters, metrics, loss and epoch values.
 
         :param mode: string
         :param min_delta: float
         :param save_last_model: bool. If True, automatically save model at each iteration under 'last_model'.
+        :param name: string, name of the model saved according to a given metric (!= last model)
         """
         self.mode = mode
         self.min_delta = min_delta
@@ -18,6 +19,7 @@ class ModelCheckpoint(object):
         self.is_better = None
         self.save_last_model = save_last_model
         self._init_is_better(mode, min_delta)
+        self.name = name
 
     def step(self, metric, epoch, model, optimizer, train_metrics=None, val_metrics=None, path=""):
         """
@@ -37,7 +39,7 @@ class ModelCheckpoint(object):
 
         if self.best is None:
             self.best = metric
-            self.save_model(metric, epoch, model, optimizer, train_metrics, val_metrics, path)
+            self.save_model(metric, epoch, model, optimizer, train_metrics, val_metrics, path, self.name)
             return True
 
         if np.isnan(metric):
@@ -45,7 +47,7 @@ class ModelCheckpoint(object):
 
         if self.is_better(metric, self.best):
             self.best = metric
-            self.save_model(metric, epoch, model, optimizer, train_metrics, val_metrics, path)
+            self.save_model(metric, epoch, model, optimizer, train_metrics, val_metrics, path, self.name)
             return True
 
         return False

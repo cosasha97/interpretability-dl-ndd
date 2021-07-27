@@ -84,7 +84,8 @@ if args.name is None:
     args.name = 'model_' + str(model_number)
 args.output_dir = os.path.join(args.output_dir, args.name)
 # configure logger
-stdout_logger = config_logger(args.output_dir)
+if not args.debug:
+    stdout_logger = config_logger(args.output_dir)
 
 # fix seeds
 torch.manual_seed(args.seed)  # pytorch
@@ -108,7 +109,10 @@ else:
     # NEW TRAINING
     print("NEW TRAINING")
     # save commandline
-    commandline_to_json(args, logger=stdout_logger)
+    if args.debug:
+        commandline_to_json(args)
+    else:
+        commandline_to_json(args, logger=stdout_logger)
 
     # load dataframes
     AD = pd.read_csv('subjects/AD.tsv', sep='\t')
@@ -198,11 +202,12 @@ optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
 # callbacks
 ES = EarlyStopping(patience=args.patience)
-MC = ModelCheckpoint(save_last_model=True)
+MC_train = ModelCheckpoint(save_last_model=True, name='train_best_model.pt')
+MC_test = ModelCheckpoint(save_last_model=False, name='test_best_model.pt')
 
 # record losses
 train_metrics = dict()
-val_metrics = dict()
+test_metrics = dict()
 
 if args.resume_training:
     # resume training
@@ -213,8 +218,8 @@ if args.resume_training:
     MC.best = last_checkpoint['loss']
     if 'train_metrics' in last_checkpoint.keys():
         train_metrics = last_checkpoint['train_metrics']
-    if 'val_metrics' in last_checkpoint.keys():
-        val_metrics = last_checkpoint['val_metrics']
+    if 'test_metrics' in last_checkpoint.keys():
+        test_metrics = last_checkpoint['test_metrics']
     model.load_state_dict(last_checkpoint['model_state_dict'])
     optimizer.load_state_dict(last_checkpoint['optimizer_state_dict'])
 
@@ -233,7 +238,7 @@ for epoch in range(first_epoch, args.nb_epochs):
                       loss_weights=args.loss_weights,
                       to_cuda=not args.cpu,
                       rescaling=stds))
-    update_dict(val_metrics,
+    update_dict(test_metrics,
                 test(model,
                      valid_loader,
                      loss_weights=args.loss_weights,
@@ -241,13 +246,20 @@ for epoch in range(first_epoch, args.nb_epochs):
                      rescaling=stds))
     if ES.step(train_metrics[args.monitor][-1]):
         break
-    MC.step(train_metrics[args.monitor][-1],
-            epoch,
-            model,
-            optimizer,
-            train_metrics,
-            val_metrics,
-            args.output_dir)
+    MC_train.step(train_metrics[args.monitor][-1],
+                  epoch,
+                  model,
+                  optimizer,
+                  train_metrics,
+                  test_metrics,
+                  args.output_dir)
+    MC_test.step(test_metrics['test'][-1],
+                 epoch,
+                 model,
+                 optimizer,
+                 train_metrics,
+                 test_metrics,
+                 args.output_dir)
     print(train_metrics)
 
 
@@ -258,6 +270,6 @@ def save_loss(loss, name="loss"):
 
 
 save_loss(train_metrics, os.path.join(args.output_dir, 'train_metrics'))
-save_loss(val_metrics, os.path.join(args.output_dir, 'val_metrics'))
+save_loss(test_metrics, os.path.join(args.output_dir, 'test_metrics'))
 # gradients
 # save_loss({'gradient_norms': model.gradient_norms}, os.path.join(args.output_dir, 'gradients'))

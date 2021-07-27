@@ -34,7 +34,14 @@ def compute_loss(output_x, true_x, output_v, true_v, output_age, true_age, outpu
     return L_disease, L_vol, L_age, L_sex, L_total
 
 
-def train(epoch, model, optimizer_, loader, loss_weights=(1., 1., 1., 1.), to_cuda=True, rescaling=None):
+def train(epoch,
+          model,
+          optimizer_,
+          loader,
+          loss_weights=(1., 1., 1., 1.),
+          to_cuda=True,
+          compute_metrics=True,
+          rescaling=None):
     """
     Training of multi-branch model
 
@@ -45,6 +52,7 @@ def train(epoch, model, optimizer_, loader, loss_weights=(1., 1., 1., 1.), to_cu
         loader: data loader
         loss_weights: list of float, weights to assign to each loss
         to_cuda: bool. If True, moves data to gpu.
+        compute_metrics: bool. If True, compute evaluation metrics for each branch.
         rescaling: pandas Series containing scaling factor (useful for metrics computation)
     """
 
@@ -64,7 +72,9 @@ def train(epoch, model, optimizer_, loader, loss_weights=(1., 1., 1., 1.), to_cu
         # zero the parameter gradients
         optimizer_.zero_grad()
         # forward
-        disease, volumes, age, sex = model(data) #, compute_metrics=True, rescaling=rescaling)
+        disease, volumes, age, sex = model(data,
+                                           compute_metrics=compute_metrics,
+                                           rescaling=rescaling)
         losses = compute_loss(disease.float(), data['label'].float(),
                               volumes.float(), data['volumes'].float(),
                               age.float(), data['age'].float(),
@@ -101,12 +111,18 @@ def train(epoch, model, optimizer_, loader, loss_weights=(1., 1., 1., 1.), to_cu
     print('Epoch: {}, Average loss: {:.4f}, Accuracy: {:.2f}'.format(epoch, train_loss, accuracy))
 
     # scale metrics and add them to dictionary
-    losses.update(model.compute_metrics())
+    if compute_metrics:
+        losses.update(model.compute_metrics())
 
     return losses
 
 
-def test(model, loader, loss_weights=(1., 1., 1., 1.), to_cuda=True, rescaling=None):
+def test(model,
+         loader,
+         loss_weights=(1., 1., 1., 1.),
+         to_cuda=True,
+         rescaling=None,
+         compute_metrics=True):
     """
     Test a trained model
 
@@ -114,6 +130,7 @@ def test(model, loader, loss_weights=(1., 1., 1., 1.), to_cuda=True, rescaling=N
         model: pytorch model
         loader: data loader
         to_cuda: bool. If True, moves data to gpu.
+        compute_metrics: bool. If True, compute evaluation metrics for each branch.
     """
     model.reset_metrics()
     model.eval()
@@ -128,7 +145,9 @@ def test(model, loader, loss_weights=(1., 1., 1., 1.), to_cuda=True, rescaling=N
                         data[key] = data[key].cuda()
                     except AttributeError:
                         pass
-            disease, volumes, age, sex = model(data, compute_metrics=True, rescaling=rescaling)
+            disease, volumes, age, sex = model(data,
+                                               compute_metrics=compute_metrics,
+                                               rescaling=rescaling)
             losses = compute_loss(disease.float(), data['label'].float(),
                                   volumes.float(), data['volumes'].float(),
                                   age.float(), data['age'].float(),
@@ -161,7 +180,8 @@ def test(model, loader, loss_weights=(1., 1., 1., 1.), to_cuda=True, rescaling=N
     print('Test set loss: {:.4f}, Accuracy: {:.2f}'.format(test_loss, accuracy))
 
     # scale metrics and add them to dictionary
-    losses.update(model.compute_metrics())
+    if compute_metrics:
+        losses.update(model.compute_metrics())
 
     return losses
 
