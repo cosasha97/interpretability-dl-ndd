@@ -15,6 +15,8 @@ def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2'):
 
     Args:
         training_data: DataFrame, with (at least) the following keys: participant_id, session_id, diagnosis, age, sex
+        pipeline_name: string
+        atlas_id: string, name of the atlas used to determine brain volumes
 
     Return:
         - stds: pandas.core.series.Series. Stds used to normalized scalar features.
@@ -27,19 +29,23 @@ def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2'):
     # fetch indexes
     df_summary = pd.read_csv(summary_path, sep='\t')
     df_summary = df_summary[(df_summary.pipeline_name == pipeline_name) & (df_summary.atlas_id == atlas_id)]
-    first_column_index = df_summary.first_column_index.item()
-    last_column_index = df_summary.last_column_index.item()
+    first_column_name = df_summary.first_column_name.item()
+    last_column_name = df_summary.last_column_name.item()
+    print('First column name: ', first_column_name)
+    print('Last column name: ', last_column_name)
+    df_data = pd.read_csv(data_path, sep='\t', nrows=1)
+    first_column_index = df_data.columns.get_loc(first_column_name)
+    last_column_index = df_data.columns.get_loc(last_column_name)
 
     # other data to fetch
-    df_data = pd.read_csv(data_path, sep='\t', nrows=1)
     col_names = ['participant_id', 'session_id', 'sex', 'age']
     add_indexes = [df_data.columns.get_loc(col_name) for col_name in col_names]
 
     # compute df_add_data
-    df_add_data = pd.read_csv(data_path, sep='\t', usecols=np.hstack([add_indexes,
-                                                                      np.arange(first_column_index,
-                                                                                last_column_index + 1)]).flatten()).dropna(
-        axis=1, how='all')
+    # add 1 to first_column_index to ignore background
+    used_columns = np.hstack([add_indexes, np.arange(first_column_index + 1, last_column_index + 1)]).flatten()
+    df_add_data = pd.read_csv(data_path, sep='\t', usecols=used_columns).dropna(axis=0, how='any')
+    print(df_add_data.head())
 
     # normalization using only statistics from training data
     temp_df = pd.merge(training_data[['participant_id', 'session_id']],

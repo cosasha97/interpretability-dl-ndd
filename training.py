@@ -115,8 +115,8 @@ else:
         commandline_to_json(args, logger=stdout_logger)
 
     # load dataframes
-    AD = pd.read_csv('subjects/AD.tsv', sep='\t')
-    CN = pd.read_csv('subjects/CN.tsv', sep='\t')
+    AD = pd.read_csv('subjects/AD.tsv', sep='\t').dropna(axis=0, how='any')
+    CN = pd.read_csv('subjects/CN.tsv', sep='\t').dropna(axis=0, how='any')
 
     # remove samples with NaN
     AD.drop(AD[AD.isna().sum(axis=1) > 0].index, inplace=True)
@@ -150,8 +150,7 @@ train_transforms, all_transforms = get_transforms('image', minmaxnormalization=T
 # fetch volumetric data
 stds, df_add_data = fetch_add_data(training_df)
 
-# all_transforms = torchvision.transforms.Compose([])
-
+# build MRI datasets
 data_train = MRIDatasetImage(caps_directory, training_df, df_add_data=df_add_data,
                              all_transformations=all_transforms)  # train_transformations=all_transforms
 data_valid = MRIDatasetImage(caps_directory, valid_df, df_add_data=df_add_data,
