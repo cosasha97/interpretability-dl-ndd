@@ -1,4 +1,131 @@
 """
 Script to generate attention maps for subjects in test set.
-One attention map is generated for age, sex and AD/CN, as well as for each volume (119 overall).
+One attention map is generated for age, sex, AD/CN, as well as for each volume (119 overall).
 """
+
+import torch
+import torch.optim as optim
+import os
+import argparse
+import re
+import logging
+import json
+import random
+from tqdm import tqdm
+
+# clinicaDL
+from clinicadl.tools.deep_learning.data import generate_sampler, return_dataset, MRIDataset, get_transforms
+from torch.utils.data import DataLoader
+from clinicadl.tools.deep_learning.iotools import commandline_to_json
+
+# own imports
+from tools.models.CN5_FC3_3D import *
+from tools.callbacks import *
+from tools.data import *
+from tools.logger import *
+from tools.settings import *
+from tools.explanations.GradCam import *
+
+# debug
+import pdb
+
+parser = argparse.ArgumentParser(description='Attribution maps generation')
+parser.add_argument('--model_path', type=str, default=None,
+                    help="""Path to configuration. """)
+parser.add_argument('--dataset', type=str, default='val',
+                    help="Dataset used to generate attribution maps.")
+parser.add_argument('--method', type=str, default='GC',
+                    help="Method used to generate attribution maps.")
+parser.add_argument('--debug', action='store_true', default=False,
+                    help="Launch debug model (use a small size dataset).")
+
+args = parser.parse_args()
+
+# general paths
+caps_directory = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021/'
+model_path = args.model_path
+
+# output path
+att_maps_path = os.path.join(model_path, 'attribution_maps', args.method, args.dataset)
+if not args.debug:
+    # configure logger
+    stdout_logger = config_logger(att_maps_path)
+print('Saving maps to {}'.format(att_maps_path))
+
+# load existing config
+if args.model_path is not None:
+    with open(os.path.join(args.model_path, 'commandline.json'), "r") as f:
+        json_data = json.load(f)
+    for key in json_data:
+        if key != 'debug':
+            setattr(args, key, json_data[key])
+else:
+    raise Exception("config_path is empty!")
+
+# build  structure
+os.makedirs(att_maps_path, exist_ok=True)
+for key in TARGET2BRANCH.keys():
+    os.makedirs(os.path.join(att_maps_path, key), exist_ok=True)
+for index in range(N_VOLUMES):
+    os.makedirs(os.path.join(att_maps_path, 'volumes', str(index)), exist_ok=True)
+
+training_df = pd.read_csv(os.path.join(model_path, 'training_df.csv'))
+valid_df = pd.read_csv(os.path.join(model_path, 'valid_df.csv'))
+
+# get transformations
+train_transforms, all_transforms = get_transforms('image', minmaxnormalization=True, data_augmentation=None)
+
+# fetch volumetric data (useless in practice)
+stds, df_add_data = fetch_add_data(training_df)
+
+# build data loader
+if args.dataset == 'train':
+    data_loader = MRIDatasetImage(caps_directory, training_df, df_add_data=df_add_data,
+                                  all_transformations=all_transforms)
+elif args.dataset == 'val':
+    data_loader = MRIDatasetImage(caps_directory, valid_df, df_add_data=df_add_data,
+                                  all_transformations=all_transforms)
+else:
+    raise Exception('No dataset.')
+
+# get sample
+sample = data_loader[0]
+# build model
+model = Net(sample, [8, 16, 32, 64, 128], args.dropout).cuda()
+# load pretrained weights on validation set
+saved_data = torch.load(os.path.join(args.model_path, 'test_best_model.pt'))
+model.load_state_dict(saved_data['model_state_dict'])
+
+# initialize interpretability method
+GC = GradCam(model)
+
+for idx, data in tqdm(enumerate(data_loader)):
+    # fetch participant and session ids
+    participant_id = data['participant_id']
+    session_id = data['session_id']
+    # build name
+    name = '_'.join((participant_id, session_id))
+    # compute attribution maps
+    for target in TARGET2BRANCH.keys():
+        if target == 'volumes':
+            for volume_index in range(N_VOLUMES):
+                att_map = GC.generate_cam(data['image'],
+                                          branch=TARGET2BRANCH[target],
+                                          resize=False,
+                                          to_cpu=True,
+                                          volume_index=volume_index)
+                np.save(os.path.join(att_maps_path, target, str(volume_index), name),
+                        att_map)
+                if args.debug:
+                    # compute only one volume
+                    break
+        else:
+            att_map = GC.generate_cam(data['image'],
+                                      branch=TARGET2BRANCH[target],
+                                      resize=False,
+                                      to_cpu=True)
+            np.save(os.path.join(att_maps_path, target, name), att_map)
+
+    if args.debug:
+        # process only one sample
+        break
