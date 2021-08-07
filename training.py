@@ -62,6 +62,7 @@ parser.add_argument('--seed', type=int, default=0,
                     help='Seed for all the process.')
 parser.add_argument('--cpu', action='store_true', default=False,
                     help="Run program on cpu.")
+parser.add_argument('--preprocessing', type=str, default='t1-volume', help="""type of preprocessing used on MRI""")
 parser.add_argument('--save_gradient_norm', action='store_true', default=False,
                     help="Save gradients norm backpropagated through the backbone"
                          "(transition from the 4 branches to the main branch)")
@@ -156,9 +157,9 @@ train_transforms, all_transforms = get_transforms('image', minmaxnormalization=T
 stds, df_add_data = fetch_add_data(training_df)
 
 # build MRI datasets
-data_train = MRIDatasetImage(caps_directory, training_df, df_add_data=df_add_data,
+data_train = MRIDatasetImage(caps_directory, training_df, df_add_data=df_add_data, preprocessing=args.preprocessing,
                              all_transformations=all_transforms)  # train_transformations=all_transforms
-data_valid = MRIDatasetImage(caps_directory, valid_df, df_add_data=df_add_data,
+data_valid = MRIDatasetImage(caps_directory, valid_df, df_add_data=df_add_data, preprocessing=args.preprocessing,
                              all_transformations=all_transforms)  # train_transformations=all_transforms,
 
 # sampler
@@ -281,7 +282,6 @@ def save_loss(loss, name="loss"):
     df[df.any(axis=1)].to_csv(name + '.csv', index=False)
 
 
+# save losses
 save_loss(train_metrics, os.path.join(args.output_dir, 'train_metrics'))
 save_loss(test_metrics, os.path.join(args.output_dir, 'test_metrics'))
-# gradients
-# save_loss({'gradient_norms': model.gradient_norms}, os.path.join(args.output_dir, 'gradients'))
