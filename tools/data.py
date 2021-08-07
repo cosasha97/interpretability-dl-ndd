@@ -60,7 +60,7 @@ def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2'):
 
 class MRIDatasetSlice(MRIDataset):
 
-    def __init__(self, caps_directory, data_file, slice_index=None, preprocessing="t1-linear",
+    def __init__(self, caps_directory, data_file, slice_index=None, preprocessing="t1-volume", # t1-linear
                  train_transformations=None, mri_plane=0, prepare_dl=False,
                  discarded_slices=20, mixed=False, labels=True, all_transformations=None,
                  multi_cohort=False,
@@ -181,7 +181,7 @@ class MRIDatasetImage(MRIDataset):
     """Dataset of MRI organized in a CAPS folder."""
 
     def __init__(self, caps_directory, data_file,
-                 preprocessing='t1-linear', train_transformations=None,
+                 preprocessing='t1-volume', train_transformations=None, # 't1-linear'
                  labels=True, all_transformations=None, multi_cohort=False,
                  df_add_data=None):
         """

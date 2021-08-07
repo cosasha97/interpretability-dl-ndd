@@ -20,6 +20,7 @@ from tools.callbacks import *
 from tools.data import *
 from train.train_CNN import *
 from tools.logger import *
+from tools.settings import *
 
 # debug
 import pdb
@@ -33,11 +34,11 @@ parser.add_argument('--name', type=str, default=None,
                     """)
 parser.add_argument('--output_dir', type=str, default='results/models',
                     help='path to store training results (model, optimizer, losses, metrics)')
-parser.add_argument('-d', '--dropout', type=float, default=0.2,
+parser.add_argument('-d', '--dropout', type=float, default=0.3,
                     help='rate of dropout that will be applied to dropout layers in CNN.')
 parser.add_argument('-bs', '--batch_size', type=int, default=4,
                     help='size of batches used during training/evaluation')
-parser.add_argument('-e', '--nb_epochs', type=int, default=30,
+parser.add_argument('-e', '--nb_epochs', type=int, default=80,
                     help='number of epochs during training')
 parser.add_argument('--num_workers', type=int, default=os.cpu_count(),
                     help='path to store training results (model, optimizer, losses, metrics)')
@@ -49,7 +50,7 @@ parser.add_argument('--monitor', type=str, default='train',
                     help='metric used to monitor progress during training')
 parser.add_argument('-lw', '--loss_weights', nargs='+', type=float, default=[1., 1., 1., 1.],
                     help='weights to assign to each branch loss')
-parser.add_argument('--patience', type=int, default=10,
+parser.add_argument('--patience', type=int, default=75,
                     help='patience of Early Stopping')
 parser.add_argument("--resume_training", action='store_true', default=False,
                     help="Load pretrained model and resume training.")
@@ -61,6 +62,9 @@ parser.add_argument('--seed', type=int, default=0,
                     help='Seed for all the process.')
 parser.add_argument('--cpu', action='store_true', default=False,
                     help="Run program on cpu.")
+parser.add_argument('--save_gradient_norm', action='store_true', default=False,
+                    help="Save gradients norm backpropagated through the backbone"
+                         "(transition from the 4 branches to the main branch)")
 
 args = parser.parse_args()
 
@@ -69,7 +73,8 @@ if args.config_path is not None:
     with open(args.config_path, "r") as f:
         json_data = json.load(f)
     for key in json_data:
-        setattr(args, key, json_data[key])
+        if key != 'debug':
+            setattr(args, key, json_data[key])
 
 # paths
 caps_directory = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021/'
@@ -174,8 +179,9 @@ valid_loader = DataLoader(data_valid,
 
 # get sample
 sample = data_train[0]
+print("Image shape: ", sample['image'].shape)
 # build model
-model = Net(sample, [8, 16, 32, 64, 128], args.dropout)
+model = Net(sample, [8, 16, 32, 64, 128], args.dropout, args.save_gradient_norm)
 
 if args.cpu:
     print("To CPU")
@@ -259,7 +265,14 @@ for epoch in range(first_epoch, args.nb_epochs):
                  train_metrics,
                  test_metrics,
                  args.output_dir)
-    print(train_metrics)
+    # save gradient norm
+    if args.save_gradient_norm:
+        # determine branch gradients are backpropagated from
+        argmax = np.argmax(args.loss_weights)
+        name = 'gradient_norms' + '_' + list(TARGET2BRANCH.keys())[argmax]
+        pd.DataFrame({name: model.gradient_norms}).to_csv(os.path.join(args.output_dir,
+                                                                       'gradient_norms.csv'),
+                                                          index=False)
 
 
 # save training curves

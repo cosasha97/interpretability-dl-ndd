@@ -11,7 +11,7 @@ import torch.nn as nn
 
 
 class Net(nn.Module):
-    def __init__(self, sample, convolutions, dropout=0.5):
+    def __init__(self, sample, convolutions, dropout=0.5, save_gradient_norm=False):
         super().__init__()
         self.image_size = sample['image'].shape
         self.features = nn.Sequential()
@@ -19,6 +19,7 @@ class Net(nn.Module):
         d_h_w = self.image_size[1:]
 
         # recorded gradient norms
+        self.save_gradient_norm = save_gradient_norm
         self.gradient_norms = []
 
         # default parameters
@@ -154,11 +155,12 @@ class Net(nn.Module):
         else:
             raise Exception('Bad input type.')
 
-    def record_gradients(self, grad_norm):
+    def record_gradients(self, grad):
         """
         Record norm of gradients at the end of self.features.
         """
-        print('GRADIENT ', torch.linalg.norm(grad_norm).item())
+        grad_norm = torch.linalg.norm(grad).item()
+        print('GRADIENT ', grad_norm)
         self.gradient_norms.append(grad_norm)
 
     def forward(self, data, compute_metrics=False, rescaling=None):
@@ -173,8 +175,8 @@ class Net(nn.Module):
         :return : loss for each branch
         """
         x = self.features(self.format_input(data))
-#         if x.requires_grad:
-#             x.register_hook(self.record_gradients)
+        if x.requires_grad and self.save_gradient_norm:
+            x.register_hook(self.record_gradients)
         disease = self.branch1(x)
         volumes = self.branch2(x)
         age = self.branch3(x)
