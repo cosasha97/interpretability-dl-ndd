@@ -27,6 +27,28 @@ import pdb
 
 # parser
 parser = argparse.ArgumentParser(description='Train 4-branch CNN')
+parser.add_argument('--config_path', type=str, default=None,
+                    help="""Path to configuration. """)
+parser.add_argument('--cpu', action='store_true', default=False,
+                    help="Run program on cpu.")
+parser.add_argument('-d', '--dropout', type=float, default=0.3,
+                    help='rate of dropout that will be applied to dropout layers in CNN.')
+parser.add_argument('-bs', '--batch_size', type=int, default=16,
+                    help='size of batches used during training/evaluation')
+parser.add_argument('--debug', action='store_true', default=False,
+                    help="Launch debug model (use a small size dataset).")
+parser.add_argument('-e', '--nb_epochs', type=int, default=80,
+                    help='number of epochs during training')
+parser.add_argument('--num_workers', type=int, default=os.cpu_count(),
+                    help='path to store training results (model, optimizer, losses, metrics)')
+parser.add_argument('-lwp', '--loss_weights_path', type=str, default=None,
+                    help='Path to numpy array storing loss weights.')
+parser.add_argument('-lr', '--learning_rate', type=float, default=1e-4,
+                    help='learning rate')
+parser.add_argument('-lw', '--loss_weights', nargs='+', type=float, default=[1., 1., 1., 1.],
+                    help='weights to assign to each branch loss')
+parser.add_argument('--monitor', type=str, default='train',
+                    help='metric used to monitor progress during training')
 parser.add_argument('--name', type=str, default=None,
                     help="""Name of the job. In case it is the same name as an an already existing job:
                     - erase and restard from scratch if resume_training is False
@@ -34,38 +56,18 @@ parser.add_argument('--name', type=str, default=None,
                     """)
 parser.add_argument('--output_dir', type=str, default='results/models',
                     help='path to store training results (model, optimizer, losses, metrics)')
-parser.add_argument('-d', '--dropout', type=float, default=0.3,
-                    help='rate of dropout that will be applied to dropout layers in CNN.')
-parser.add_argument('-bs', '--batch_size', type=int, default=4,
-                    help='size of batches used during training/evaluation')
-parser.add_argument('-e', '--nb_epochs', type=int, default=80,
-                    help='number of epochs during training')
-parser.add_argument('--num_workers', type=int, default=os.cpu_count(),
-                    help='path to store training results (model, optimizer, losses, metrics)')
-parser.add_argument('-lr', '--learning_rate', type=float, default=1e-4,
-                    help='learning rate')
-parser.add_argument('-wd', '--weight_decay', type=float, default=1e-4,
-                    help='weight decay')
-parser.add_argument('--monitor', type=str, default='train',
-                    help='metric used to monitor progress during training')
-parser.add_argument('-lw', '--loss_weights', nargs='+', type=float, default=[1., 1., 1., 1.],
-                    help='weights to assign to each branch loss')
 parser.add_argument('--patience', type=int, default=75,
                     help='patience of Early Stopping')
+parser.add_argument('--preprocessing', type=str, default='t1-volume', help="""type of preprocessing used on MRI""")
 parser.add_argument("--resume_training", action='store_true', default=False,
                     help="Load pretrained model and resume training.")
-parser.add_argument('--config_path', type=str, default=None,
-                    help="""Path to configuration. """)
-parser.add_argument('--debug', action='store_true', default=False,
-                    help="Launch debug model (use a small size dataset).")
-parser.add_argument('--seed', type=int, default=0,
-                    help='Seed for all the process.')
-parser.add_argument('--cpu', action='store_true', default=False,
-                    help="Run program on cpu.")
-parser.add_argument('--preprocessing', type=str, default='t1-volume', help="""type of preprocessing used on MRI""")
 parser.add_argument('--save_gradient_norm', action='store_true', default=False,
                     help="Save gradients norm backpropagated through the backbone"
                          "(transition from the 4 branches to the main branch)")
+parser.add_argument('--seed', type=int, default=0,
+                    help='Seed for all the process.')
+parser.add_argument('-wd', '--weight_decay', type=float, default=1e-4,
+                    help='weight decay')
 
 args = parser.parse_args()
 
@@ -76,6 +78,10 @@ if args.config_path is not None:
     for key in json_data:
         if key != 'debug':
             setattr(args, key, json_data[key])
+
+# load loss weights
+if args.loss_weights_path is not None:
+    args.loss_weights = list(np.load(args.loss_weights_path))
 
 # paths
 caps_directory = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021/'
@@ -129,8 +135,8 @@ else:
     CN.drop(CN[CN.isna().sum(axis=1) > 0].index, inplace=True)
 
     # split data between training and validation sets
-    training_df, valid_df = create_split('AD', AD, 'diagnosis', 0.2)
-    df_CN = create_split('CN', CN, 'diagnosis', 0.2)
+    training_df, valid_df = create_split('AD', AD, 'diagnosis', 0.2) #0.2
+    df_CN = create_split('CN', CN, 'diagnosis', 0.2) #0.2
     training_df = training_df.append(df_CN[0])
     valid_df = valid_df.append(df_CN[1])
 
@@ -162,19 +168,31 @@ data_train = MRIDatasetImage(caps_directory, training_df, df_add_data=df_add_dat
 data_valid = MRIDatasetImage(caps_directory, valid_df, df_add_data=df_add_data, preprocessing=args.preprocessing,
                              all_transformations=all_transforms)  # train_transformations=all_transforms,
 
-# sampler
-train_sampler = generate_sampler(data_train)
-valid_sampler = generate_sampler(data_valid)
-# loaders
+# # sampler
+# train_sampler = generate_sampler(data_train)
+# valid_sampler = generate_sampler(data_valid)
+# # loaders
+# train_loader = DataLoader(data_train,
+#                           batch_size=args.batch_size,
+#                           sampler=train_sampler,
+#                           num_workers=args.num_workers,
+#                           pin_memory=True)
+
+# valid_loader = DataLoader(data_valid,
+#                           batch_size=args.batch_size,
+#                           sampler=valid_sampler,
+#                           num_workers=args.num_workers,
+#                           pin_memory=True)
+
 train_loader = DataLoader(data_train,
                           batch_size=args.batch_size,
-                          sampler=train_sampler,
+                          shuffle=True,
                           num_workers=args.num_workers,
                           pin_memory=True)
 
 valid_loader = DataLoader(data_valid,
                           batch_size=args.batch_size,
-                          sampler=valid_sampler,
+                          shuffle=False,
                           num_workers=args.num_workers,
                           pin_memory=True)
 
@@ -240,7 +258,8 @@ for epoch in range(first_epoch, args.nb_epochs):
     update_dict(train_metrics,
                 train(epoch,
                       model,
-                      optimizer, train_loader,
+                      optimizer,
+                      train_loader,
                       loss_weights=args.loss_weights,
                       to_cuda=not args.cpu,
                       rescaling=stds))

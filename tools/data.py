@@ -52,10 +52,12 @@ def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2'):
     # normalization using only statistics from training data
     temp_df = pd.merge(training_data[['participant_id', 'session_id']],
                        df_add_data, on=['participant_id', 'session_id'], how='left')
-    scalar_cols = temp_df.columns.difference(['participant_id', 'session_id', 'sex'])
+    # scalar_cols = temp_df.columns.difference(['participant_id', 'session_id', 'sex'])
+    scalar_cols = [col for col in temp_df.columns if col not in ['participant_id', 'session_id', 'sex']]
     # df_add_data[scalar_cols] contains only scalar columns with (patient, session) from training set
     means, stds = temp_df[scalar_cols].mean(), temp_df[scalar_cols].std()
     df_add_data[scalar_cols] = (df_add_data[scalar_cols] - means) / stds
+    print('stds keys: ', stds.keys())
 
     return stds, df_add_data
 

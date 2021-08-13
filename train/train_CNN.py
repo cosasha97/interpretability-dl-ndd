@@ -72,6 +72,7 @@ def train(epoch,
         # zero the parameter gradients
         optimizer_.zero_grad()
         # forward
+        # print(data['image'].shape)
         disease, volumes, age, sex = model(data,
                                            compute_metrics=compute_metrics,
                                            rescaling=rescaling)
@@ -108,7 +109,7 @@ def train(epoch,
     # other metrics
     accuracy = 100 * correct / len(loader.dataset)
 
-    print('Epoch: {}, Average loss: {:.4f}, Accuracy: {:.2f}'.format(epoch, train_loss, accuracy))
+    print('Epoch: {}, Average loss: {:.4f}, Accuracy: {:.2f}'.format(epoch, losses['train'], accuracy))
 
     # scale metrics and add them to dictionary
     if compute_metrics:
@@ -133,7 +134,8 @@ def test(model,
         compute_metrics: bool. If True, compute evaluation metrics for each branch.
     """
     model.reset_metrics()
-    model.eval()
+    # model.eval()
+    print("No eval model!")
     test_loss = 0
     L_disease, L_vol, L_age, L_sex = 0, 0, 0, 0
     correct = 0.
@@ -177,7 +179,7 @@ def test(model,
     # other metrics
     accuracy = 100 * correct / len(loader.dataset)
 
-    print('Test set loss: {:.4f}, Accuracy: {:.2f}'.format(test_loss, accuracy))
+    print('Test set loss: {:.4f}, Accuracy: {:.2f}'.format(losses['test'], accuracy))
 
     # scale metrics and add them to dictionary
     if compute_metrics:

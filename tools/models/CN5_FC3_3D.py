@@ -189,7 +189,10 @@ class Net(nn.Module):
             # rescaling parameters
             if rescaling is not None:
                 # volumes
-                b2_scale = torch.tensor(rescaling[rescaling.keys().difference(['age'])].values[None, ...])
+                # pdb.set_trace()
+                # cols = rescaling.keys().difference(['age'])
+                cols = [key for key in rescaling.keys() if key != 'age']
+                b2_scale = torch.tensor(rescaling[cols].values[None, ...])
                 # age
                 b3_scale = torch.tensor(rescaling['age'].reshape(1))
             else:
