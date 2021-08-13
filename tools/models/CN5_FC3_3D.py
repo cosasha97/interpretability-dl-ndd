@@ -133,7 +133,7 @@ class Net(nn.Module):
             sequential_block.add_module(prefix + 'linear' + str(k), nn.Linear(in_features, df))
             in_features = df
             sequential_block.add_module(prefix + 'relu' + str(k), nn.ReLU())
-            sequential_block.add_module(prefix + 'batchnorm' + str(k), nn.BatchNorm1d(df))
+            # sequential_block.add_module(prefix + 'batchnorm' + str(k), nn.BatchNorm1d(df))
             sequential_block.add_module(prefix + 'dropout' + str(k), nn.Dropout(p=self.dropout))
         sequential_block.add_module(prefix + 'linear' + str(len(dense_features) - 1),
                                     nn.Linear(in_features, dense_features[-1]))

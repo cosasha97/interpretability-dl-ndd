@@ -39,6 +39,8 @@ parser.add_argument('--debug', action='store_true', default=False,
                     help="Launch debug model (use a small size dataset).")
 parser.add_argument('-e', '--nb_epochs', type=int, default=80,
                     help='number of epochs during training')
+parser.add_argument('--eval_mode', action='store_false', default=True,
+                    help="During test/validation, model is set in evaluation mode.")
 parser.add_argument('--num_workers', type=int, default=os.cpu_count(),
                     help='path to store training results (model, optimizer, losses, metrics)')
 parser.add_argument('-lwp', '--loss_weights_path', type=str, default=None,
@@ -268,7 +270,8 @@ for epoch in range(first_epoch, args.nb_epochs):
                      valid_loader,
                      loss_weights=args.loss_weights,
                      to_cuda=not args.cpu,
-                     rescaling=stds))
+                     rescaling=stds,
+                     eval_mode=args.eval_mode))
     if ES.step(train_metrics[args.monitor][-1]):
         break
     MC_train.step(train_metrics[args.monitor][-1],

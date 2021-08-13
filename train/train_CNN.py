@@ -123,7 +123,8 @@ def test(model,
          loss_weights=(1., 1., 1., 1.),
          to_cuda=True,
          rescaling=None,
-         compute_metrics=True):
+         compute_metrics=True,
+         eval_mode=True):
     """
     Test a trained model
 
@@ -134,8 +135,11 @@ def test(model,
         compute_metrics: bool. If True, compute evaluation metrics for each branch.
     """
     model.reset_metrics()
-    # model.eval()
-    print("No eval model!")
+    if eval_mode:
+        model.eval()
+        print("Eval mode: activated.")
+    else:
+        print("Eval mode: not activated.")
     test_loss = 0
     L_disease, L_vol, L_age, L_sex = 0, 0, 0, 0
     correct = 0.
@@ -147,9 +151,19 @@ def test(model,
                         data[key] = data[key].cuda()
                     except AttributeError:
                         pass
-            disease, volumes, age, sex = model(data,
-                                               compute_metrics=compute_metrics,
-                                               rescaling=rescaling)
+
+            if eval_mode:
+                disease, volumes, age, sex = model(data,
+                                                   compute_metrics=compute_metrics,
+                                                   rescaling=rescaling)
+            else:
+                model.train()
+                _ = model(data, compute_metrics=compute_metrics, rescaling=rescaling)
+                model.eval()
+                disease, volumes, age, sex = model(data,
+                                                   compute_metrics=compute_metrics,
+                                                   rescaling=rescaling)
+
             losses = compute_loss(disease.float(), data['label'].float(),
                                   volumes.float(), data['volumes'].float(),
                                   age.float(), data['age'].float(),
