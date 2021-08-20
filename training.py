@@ -25,16 +25,30 @@ from tools.settings import *
 # debug
 import pdb
 
+"""
+Important args:
+- dropout
+- batch_size
+- epochs
+- eval_mode
+- lwp
+- lw
+- preprocessing
+- save_gradient_norm
+"""
+
 # parser
 parser = argparse.ArgumentParser(description='Train 4-branch CNN')
+parser.add_argument('-bs', '--batch_size', type=int, default=16,
+                    help='size of batches used during training/evaluation')
 parser.add_argument('--config_path', type=str, default=None,
                     help="""Path to configuration. """)
+parser.add_argument('--convolutions', nargs='+', type=int, default=[8, 16, 32, 64, 128],
+                    help='Number of filters for each convolutional layer.')
 parser.add_argument('--cpu', action='store_true', default=False,
                     help="Run program on cpu.")
 parser.add_argument('-d', '--dropout', type=float, default=0.3,
                     help='rate of dropout that will be applied to dropout layers in CNN.')
-parser.add_argument('-bs', '--batch_size', type=int, default=16,
-                    help='size of batches used during training/evaluation')
 parser.add_argument('--debug', action='store_true', default=False,
                     help="Launch debug model (use a small size dataset).")
 parser.add_argument('-e', '--nb_epochs', type=int, default=80,
@@ -83,7 +97,7 @@ if args.config_path is not None:
 
 # load loss weights
 if args.loss_weights_path is not None:
-    args.loss_weights = list(np.load(args.loss_weights_path))
+    args.loss_weights = list(np.load(args.loss_weights_path).astype(np.float))
 
 # paths
 caps_directory = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021/'
@@ -170,22 +184,6 @@ data_train = MRIDatasetImage(caps_directory, training_df, df_add_data=df_add_dat
 data_valid = MRIDatasetImage(caps_directory, valid_df, df_add_data=df_add_data, preprocessing=args.preprocessing,
                              all_transformations=all_transforms)  # train_transformations=all_transforms,
 
-# # sampler
-# train_sampler = generate_sampler(data_train)
-# valid_sampler = generate_sampler(data_valid)
-# # loaders
-# train_loader = DataLoader(data_train,
-#                           batch_size=args.batch_size,
-#                           sampler=train_sampler,
-#                           num_workers=args.num_workers,
-#                           pin_memory=True)
-
-# valid_loader = DataLoader(data_valid,
-#                           batch_size=args.batch_size,
-#                           sampler=valid_sampler,
-#                           num_workers=args.num_workers,
-#                           pin_memory=True)
-
 train_loader = DataLoader(data_train,
                           batch_size=args.batch_size,
                           shuffle=True,
@@ -202,7 +200,7 @@ valid_loader = DataLoader(data_valid,
 sample = data_train[0]
 print("Image shape: ", sample['image'].shape)
 # build model
-model = Net(sample, [8, 16, 32, 64, 128], args.dropout, args.save_gradient_norm)
+model = Net(sample, args.convolutions, args.dropout, args.save_gradient_norm)
 
 if args.cpu:
     print("To CPU")

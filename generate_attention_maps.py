@@ -31,7 +31,7 @@ import pdb
 
 parser = argparse.ArgumentParser(description='Attribution maps generation')
 parser.add_argument('--model_path', type=str, default=None,
-                    help="""Path to configuration. """)
+                    help="""Path to configuration (folder). """)
 parser.add_argument('--dataset', type=str, default='val',
                     help="Dataset used to generate attribution maps.")
 parser.add_argument('--method', type=str, default='GC',
@@ -81,9 +81,9 @@ stds, df_add_data = fetch_add_data(training_df)
 # build data loader
 if args.dataset == 'train':
     data_loader = MRIDatasetImage(caps_directory, training_df, df_add_data=df_add_data,
-                                  all_transformations=all_transforms)
+                                  preprocessing=args.preprocessing, all_transformations=all_transforms)
 elif args.dataset == 'val':
-    data_loader = MRIDatasetImage(caps_directory, valid_df, df_add_data=df_add_data,
+    data_loader = MRIDatasetImage(caps_directory, valid_df, df_add_data=df_add_data, preprocessing=args.preprocessing,
                                   all_transformations=all_transforms)
 else:
     raise Exception('No dataset.')
@@ -91,7 +91,7 @@ else:
 # get sample
 sample = data_loader[0]
 # build model
-model = Net(sample, [8, 16, 32, 64, 128], args.dropout).cuda()
+model = Net(sample, args.convolutions, args.dropout, args.save_gradient_norm).cuda()
 # load pretrained weights on validation set
 saved_data = torch.load(os.path.join(args.model_path, 'test_best_model.pt'))
 model.load_state_dict(saved_data['model_state_dict'])
