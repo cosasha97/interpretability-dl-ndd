@@ -113,34 +113,40 @@ def update_atlas_tsv(atlas_tsv):
     return atlas_tsv
 
 
-def region_scores(data, atlas_map, atlas_tsv, resize=True):
+def region_scores(data, atlas_tsv, atlas_map, resize=True):
     """
     Compute attention scores for each region.
 
     Params:
         - data: array, attention map
-        - atlas_map: array, index of the regions
         - atlas_tsv: pandas DataFrame with roi_name and roi_value
+        - atlas_map: array, index of the regions
         - resize: bool. If True, resize data to atlas_map.shape
 
     Returns:
         - scores: array of attention scores
     """
+    # replace potential NaN with 0
+    if np.isnan(data) > 0:
+        return None
+
     if resize:
         resized_data = zoom(data, atlas_map.shape / np.array(data.shape))
+    else:
+        resized_data = data
 
     # regional score computation
     scores = np.zeros(len(atlas_tsv))
     for k, roi_val in enumerate(atlas_tsv['roi_value']):
         if type(roi_val) == int:
             # simple region
-            scores[k] = resized_data[atlas_map == roi_val].sum() / (atlas_map == roi_val).sum()
+            scores[k] = (resized_data[atlas_map == roi_val]).sum() / (atlas_map == roi_val).sum()
         else:
             # main region
             temp_score = 0
             temp_area = 0
             for val in roi_val:
-                temp_score += resized_data[atlas_map == val].sum()
+                temp_score += (resized_data[atlas_map == val]).sum()
                 temp_area += (atlas_map == val).sum()
             scores[k] = temp_score / temp_area
 

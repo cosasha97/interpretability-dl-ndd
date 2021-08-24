@@ -12,3 +12,6 @@ BRANCH2TARGET = {
 TARGET2BRANCH = {v: k for k, v in BRANCH2TARGET.items()}
 
 N_VOLUMES = 120
+
+# global paths
+caps_path = '/network/lustre/dtlake01/aramis/datasets/{}/caps/caps_v2021/'

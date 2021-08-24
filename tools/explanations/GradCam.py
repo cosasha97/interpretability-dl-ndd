@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.ndimage import zoom
 from tools.settings import *
+import pdb
 
 
 class CamExtractor():
@@ -33,8 +34,12 @@ class CamExtractor():
             if branch is None:
                 raise Exception("Either target_layer or branch must not be None.")
             x = self.model.features(x)
-            module_pos, module = next(iter(getattr(self.model, branch)._modules.items()))
-            x = module(x)
+            for k, (module_pos, module) in enumerate(getattr(self.model, branch)._modules.items()):
+                # use only conv and relu layers
+                # module_pos, module = next(iter(getattr(self.model, branch)._modules.items()))
+                x = module(x)
+                if k == 1:
+                    break
             x.register_hook(self.save_gradient)
             conv_output = x
 
@@ -53,7 +58,7 @@ class CamExtractor():
         else:
             for k, (module_pos, module) in enumerate(getattr(self.model, branch)._modules.items()):
                 # do not apply again last convolution
-                if k != 0:
+                if k > 1:  # conv & relu already used
                     x = module(x)  # Forward
         return conv_output, x
 
@@ -119,7 +124,8 @@ class GradCam():
         # Get convolution outputs
         target = conv_output.data[0]
         # Get weights from gradients
-        weights = guided_gradients.mean(axis=(1, 2, 3))  # Take averages for each gradient
+        # .mean replaced by .sum to avoid very little numerical values
+        weights = guided_gradients.sum(axis=(1, 2, 3))  # Take averages for each gradient
         # Multiply each weight with its conv output and then, sum
         cam = (weights.view(weights.shape + (1, 1, 1)) * target).sum(axis=0)
         cam = torch.where(cam > self.null_scalar, cam, self.null_scalar)

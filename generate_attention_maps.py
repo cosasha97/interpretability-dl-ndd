@@ -42,7 +42,10 @@ parser.add_argument('--debug', action='store_true', default=False,
 args = parser.parse_args()
 
 # general paths
-caps_directory = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021/'
+if args.dataset == 'aibl':
+    caps_directory = caps_path.format('aibl')
+else:
+    caps_directory = caps_path.format('adni')
 model_path = args.model_path
 
 # output path
