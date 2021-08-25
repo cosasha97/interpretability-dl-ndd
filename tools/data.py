@@ -4,37 +4,50 @@ import torch
 import numpy as np
 import pandas as pd
 from os import path
+import re
+from tools.settings import *
 
 # clinicaDL
 from clinicadl.tools.deep_learning.data import generate_sampler, return_dataset, MRIDataset, MRIDatasetImage, \
     MRIDatasetSlice, get_transforms
 
 
-def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2'):
+def get_subjects(study='aibl'):
     """
-    Fetch additional data: age, sex and volumes.
-    Normalize scalar data.
+    Fetch subjects for a given study.
+    :param study: string, AIBL or ADNI
+    :return: pandas DataFrame
+    """
+    AIBL_CN = pd.read_csv('subjects/{}/CN.tsv'.format(study.upper()), sep='\t')
+    AIBL_AD = pd.read_csv('subjects/{}/AD.tsv'.format(study.upper()), sep='\t')
+    return AIBL_CN.append(AIBL_AD)
 
-    Args:
-        training_data: DataFrame, with (at least) the following keys: participant_id, session_id, diagnosis, age, sex
-        pipeline_name: string
-        atlas_id: string, name of the atlas used to determine brain volumes
 
-    Return:
-        - stds: pandas.core.series.Series. Stds used to normalized scalar features.
-        - df_add_data: DataFrame containing the normalized additional data
+def compute_target_df(study='adni', pipeline_name='t1-volume', atlas_id='AAL2', nrows=None, verbose=0):
+    """
+    Compute dataframe containing all the raw targets.
+
+    :param study: string, ADNI or AIBL
+    :param pipeline_name: string
+    :param atlas_id: string
+    :param nrows: int, number of loaded rows
+    :param verbose: int.
+    :return: pandas DataFrame
     """
     # paths
-    data_path = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021.tsv'
-    summary_path = '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021_summary.tsv'
+    data_path = caps_path[study.lower()]
+    summary_path = caps_summary_path[study.lower()]
 
     # fetch indexes
     df_summary = pd.read_csv(summary_path, sep='\t')
     df_summary = df_summary[(df_summary.pipeline_name == pipeline_name) & (df_summary.atlas_id == atlas_id)]
+    df_summary['group_name'] = df_summary.group_id.apply(lambda x: re.findall('(?:adni|aibl)', x.lower())[0])
+    df_summary = df_summary[(df_summary.group_name == study)]
     first_column_name = df_summary.first_column_name.item()
     last_column_name = df_summary.last_column_name.item()
-    print('First column name: ', first_column_name)
-    print('Last column name: ', last_column_name)
+    if verbose > 0:
+        print('First column name: ', first_column_name)
+        print('Last column name: ', last_column_name)
     df_data = pd.read_csv(data_path, sep='\t', nrows=1)
     first_column_index = df_data.columns.get_loc(first_column_name)
     last_column_index = df_data.columns.get_loc(last_column_name)
@@ -43,11 +56,74 @@ def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2'):
     col_names = ['participant_id', 'session_id', 'sex', 'age']
     add_indexes = [df_data.columns.get_loc(col_name) for col_name in col_names]
 
-    # compute df_add_data
-    # add 1 to first_column_index to ignore background
+    # compute dataframe
+    # add 1 to first_column_index to ignore background volume
     used_columns = np.hstack([add_indexes, np.arange(first_column_index + 1, last_column_index + 1)]).flatten()
-    df_add_data = pd.read_csv(data_path, sep='\t', usecols=used_columns).dropna(axis=0, how='any')
-    print(df_add_data.head())
+    raw_data = pd.read_csv(data_path, sep='\t', usecols=used_columns, nrows=nrows).dropna(axis=0, how='any')
+    raw_data = raw_data.reset_index().drop(columns=['index'])
+    if verbose > 0:
+        print(raw_data.columns)
+
+    return raw_data
+
+
+def normalize_df(raw_dataframe, norm_means, norm_stds):
+    """
+    Normalize raw_dataframe scalar columns using norm_means and norm_stds
+
+    :param raw_dataframe: pandas dataframe
+    :param norm_means: pandas series containing normalization means
+    :param norm_stds: pandas series containing normalization stds
+    :return: normalized pandas DataFrame
+    """
+    scalar_cols = [col for col in raw_dataframe.columns if col not in ['participant_id', 'session_id', 'sex']]
+    raw_dataframe[scalar_cols] = (raw_dataframe[scalar_cols] - norm_means.to_numpy().reshape((1, -1))) / norm_stds.to_numpy().reshape((1, -1))
+    return raw_dataframe
+
+
+def get_normalization_factors(training_data, pipeline_name='t1-volume', atlas_id='AAL2', study='adni'):
+    """
+    Compute normalization factors for scalar features using training data.
+
+    :param training_data: dataframe
+    :param pipeline_name: string
+    :param atlas_id: string
+    :param study: string
+    :return:
+        - means: pandas series
+        - stds: pandas series
+    """
+    # compute raw (unnormalized) dataframe
+    df_add_data = compute_target_df(study, pipeline_name, atlas_id)
+
+    # normalization using only statistics from training data
+    temp_df = pd.merge(training_data[['participant_id', 'session_id']],
+                       df_add_data, on=['participant_id', 'session_id'], how='left')
+    # scalar_cols = temp_df.columns.difference(['participant_id', 'session_id', 'sex'])
+    scalar_cols = [col for col in temp_df.columns if col not in ['participant_id', 'session_id', 'sex']]
+    # df_add_data[scalar_cols] contains only scalar columns with (patient, session) from training set
+    means, stds = temp_df[scalar_cols].mean(), temp_df[scalar_cols].std()
+    return means, stds
+
+
+def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2', study='adni'):
+    """
+    Fetch additional data: age, sex and volumes.
+    Normalize scalar data.
+
+    Args:
+        training_data: DataFrame, with (at least) the following keys: participant_id, session_id, diagnosis, age, sex
+        pipeline_name: string
+        atlas_id: string, name of the atlas used to determine brain volumes
+        study: string, adni or aibl
+
+    Return:
+        - stds: pandas.core.series.Series. Stds used to normalized scalar features.
+        - df_add_data: DataFrame containing the normalized additional data
+    """
+
+    # compute raw (unnormalized) dataframe
+    df_add_data = compute_target_df(study, pipeline_name, atlas_id)
 
     # normalization using only statistics from training data
     temp_df = pd.merge(training_data[['participant_id', 'session_id']],

@@ -1,6 +1,9 @@
 """
 Script to generate attention maps for subjects in test set.
 One attention map is generated for age, sex, AD/CN, as well as for each volume (119 overall).
+
+Train & test sets come from ADNI.
+Validation set comes from AIBL.
 """
 
 import torch
@@ -42,10 +45,10 @@ parser.add_argument('--debug', action='store_true', default=False,
 args = parser.parse_args()
 
 # general paths
-if args.dataset == 'aibl':
-    caps_directory = caps_path.format('aibl')
+if args.dataset == 'test':
+    caps_directory = caps_path['aibl']
 else:
-    caps_directory = caps_path.format('adni')
+    caps_directory = caps_path['adni']
 model_path = args.model_path
 
 # output path
@@ -88,6 +91,8 @@ if args.dataset == 'train':
 elif args.dataset == 'val':
     data_loader = MRIDatasetImage(caps_directory, valid_df, df_add_data=df_add_data, preprocessing=args.preprocessing,
                                   all_transformations=all_transforms)
+# elif args.dataset == 'test':
+#     data_loader =
 else:
     raise Exception('No dataset.')
 

@@ -14,4 +14,10 @@ TARGET2BRANCH = {v: k for k, v in BRANCH2TARGET.items()}
 N_VOLUMES = 120
 
 # global paths
-caps_path = '/network/lustre/dtlake01/aramis/datasets/{}/caps/caps_v2021/'
+caps_path = {'adni': '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021.tsv',
+             'aibl': '/network/lustre/dtlake01/aramis/datasets/aibl/caps/CAPS.tsv'}
+caps_summary_path = {'adni': '/network/lustre/dtlake01/aramis/datasets/adni/caps/caps_v2021_summary.tsv',
+                     'aibl': '/network/lustre/dtlake01/aramis/datasets/aibl/caps/CAPS_summary.tsv'}
+
+
+# dataset split for parallelization

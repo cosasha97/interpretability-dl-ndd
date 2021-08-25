@@ -143,8 +143,8 @@ else:
         commandline_to_json(args, logger=stdout_logger)
 
     # load dataframes
-    AD = pd.read_csv('subjects/AD.tsv', sep='\t').dropna(axis=0, how='any')
-    CN = pd.read_csv('subjects/CN.tsv', sep='\t').dropna(axis=0, how='any')
+    AD = pd.read_csv('subjects/ADNI/AD.tsv', sep='\t').dropna(axis=0, how='any')
+    CN = pd.read_csv('subjects/ADNI/CN.tsv', sep='\t').dropna(axis=0, how='any')
 
     # remove samples with NaN
     AD.drop(AD[AD.isna().sum(axis=1) > 0].index, inplace=True)
