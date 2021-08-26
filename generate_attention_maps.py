@@ -33,7 +33,7 @@ from tools.explanations.GradCam import *
 import pdb
 
 parser = argparse.ArgumentParser(description='Attribution maps generation')
-parser.add_argument('--model_path', type=str, default=None,
+parser.add_argument('--model_folder', type=str, default=None,
                     help="""Path to configuration (folder). """)
 parser.add_argument('--dataset', type=str, default='val',
                     help="Dataset used to generate attribution maps.")
@@ -44,23 +44,33 @@ parser.add_argument('--debug', action='store_true', default=False,
 
 args = parser.parse_args()
 
-# general paths
-if args.dataset == 'test':
-    caps_directory = caps_path['aibl']
+# load training subjects
+training_df = pd.read_csv(os.path.join(args.model_folder, 'training_df.csv'))
+
+# determine study
+if args.dataset == 'train':
+    study = 'adni'
+    subjects = training_df
+elif args.dataset == 'val':
+    study = 'adni'
+    subjects = pd.read_csv(os.path.join(args.model_folder, 'valid_df.csv'))
+elif args.dataset == 'test':
+    study = 'aibl'
+    subjects = get_subjects('aibl')
 else:
-    caps_directory = caps_path['adni']
-model_path = args.model_path
+    raise Exception("Unknown dataset!")
+model_folder = args.model_folder
 
 # output path
-att_maps_path = os.path.join(model_path, 'attribution_maps', args.method, args.dataset)
+att_maps_path = os.path.join(model_folder, 'attribution_maps', args.method, args.dataset)
 if not args.debug:
     # configure logger
     stdout_logger = config_logger(att_maps_path)
 print('Saving maps to {}'.format(att_maps_path))
 
 # load existing config
-if args.model_path is not None:
-    with open(os.path.join(args.model_path, 'commandline.json'), "r") as f:
+if args.model_folder is not None:
+    with open(os.path.join(args.model_folder, 'commandline.json'), "r") as f:
         json_data = json.load(f)
     for key in json_data:
         if key != 'debug':
@@ -75,33 +85,40 @@ for key in TARGET2BRANCH.keys():
 for index in range(N_VOLUMES):
     os.makedirs(os.path.join(att_maps_path, 'volumes', str(index)), exist_ok=True)
 
-training_df = pd.read_csv(os.path.join(model_path, 'training_df.csv'))
-valid_df = pd.read_csv(os.path.join(model_path, 'valid_df.csv'))
-
 # get transformations
 train_transforms, all_transforms = get_transforms('image', minmaxnormalization=True, data_augmentation=None)
 
-# fetch volumetric data (useless in practice)
-stds, df_add_data = fetch_add_data(training_df)
+# build target dataframe (useless in practice)
+# stds, df_add_data = fetch_add_data(training_df)
+raw_target_df = compute_target_df(study=study)
+raw_target_df = pd.merge(raw_target_df, subjects[['participant_id', 'session_id']], on=['participant_id', 'session_id'])
+raw_target_df.to_csv(os.path.join(output_path, 'raw_target_df.csv'), index=False)
+means, stds = get_normalization_factors(training_df)
+target_df = normalize_df(raw_target_df, means, stds)
 
 # build data loader
-if args.dataset == 'train':
-    data_loader = MRIDatasetImage(caps_directory, training_df, df_add_data=df_add_data,
-                                  preprocessing=args.preprocessing, all_transformations=all_transforms)
-elif args.dataset == 'val':
-    data_loader = MRIDatasetImage(caps_directory, valid_df, df_add_data=df_add_data, preprocessing=args.preprocessing,
-                                  all_transformations=all_transforms)
-# elif args.dataset == 'test':
-#     data_loader =
-else:
-    raise Exception('No dataset.')
+# if args.dataset == 'train':
+#     data_loader = MRIDatasetImage(caps_directory, training_df, df_add_data=df_add_data,
+#                                   preprocessing=args.preprocessing, all_transformations=all_transforms)
+# elif args.dataset == 'val':
+#     data_loader = MRIDatasetImage(caps_directory, valid_df, df_add_data=df_add_data, preprocessing=args.preprocessing,
+#                                   all_transformations=all_transforms)
+# # elif args.dataset == 'test':
+# #     data_loader =
+# else:
+#     raise Exception('No dataset.')
+data_loader = MRIDatasetImage(caps_directory[study],
+                              target_df[['participant_id', 'session_id', 'diagnosis']],
+                              df_add_data=target_df,
+                              preprocessing=args.preprocessing,
+                              all_transformations=all_transforms)
 
 # get sample
 sample = data_loader[0]
 # build model
 model = Net(sample, args.convolutions, args.dropout, args.save_gradient_norm).cuda()
 # load pretrained weights on validation set
-saved_data = torch.load(os.path.join(args.model_path, 'test_best_model.pt'))
+saved_data = torch.load(os.path.join(args.model_folder, 'test_best_model.pt'))
 model.load_state_dict(saved_data['model_state_dict'])
 
 # initialize interpretability method

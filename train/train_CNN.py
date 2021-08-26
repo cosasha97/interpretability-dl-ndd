@@ -1,8 +1,9 @@
-import torch
+import numpy as np
 from tqdm import tqdm
 import pdb
 
 # torch
+import torch
 import torch.nn as nn
 
 
@@ -200,10 +201,10 @@ def test(model,
             if save_predictions:
                 participant_id = participant_id + data['participant_id']
                 session_id = session_id + data['session_id']
-                pred_disease = update_predictions(pred_disease, disease.cpu())
-                pred_volumes = update_predictions(pred_volumes, volumes.cpu())
-                pred_age = update_predictions(pred_age, age.cpu())
-                pred_sex = update_predictions(pred_sex, sex.cpu())
+                pred_disease = update_predictions(pred_disease, disease.cpu().numpy())
+                pred_volumes = update_predictions(pred_volumes, volumes.cpu().numpy())
+                pred_age = update_predictions(pred_age, age.cpu().numpy())
+                pred_sex = update_predictions(pred_sex, sex.cpu().numpy())
 
             losses = compute_loss(disease.float(), data['label'].float(),
                                   volumes.float(), data['volumes'].float(),

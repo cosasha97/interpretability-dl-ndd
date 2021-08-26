@@ -40,12 +40,19 @@ if args.model_folder is not None:
 else:
     raise Exception("config_path is empty!")
 
+if not hasattr(args, 'convolutions'):
+    setattr(args, 'convolutions', [8, 16, 32, 64, 128])
+if not hasattr(args, 'preprocessing'):
+    setattr(args, 'preprocessing', 't1-linear')
+if not hasattr(args, 'save_gradient_norm'):
+    setattr(args, 'save_gradient_norm', False)
+
 # fix seed
 set_seed(args.seed)
 
 # build  structure
 output_path = os.path.join(args.model_folder, 'predictions', args.dataset)
-os.makedirs(att_maps_path, exist_ok=True)
+os.makedirs(output_path, exist_ok=True)
 
 # load training dataframe
 training_df = pd.read_csv(os.path.join(args.model_folder, 'training_df.csv'))
@@ -65,9 +72,11 @@ else:
 
 # build target dataframe
 raw_target_df = compute_target_df(study=study)
+raw_target_df = pd.merge(raw_target_df, subjects[['participant_id', 'session_id']], on=['participant_id', 'session_id'])
+raw_target_df.to_csv(os.path.join(output_path, 'raw_target_df.csv'), index=False)
 means, stds = get_normalization_factors(training_df)
 target_df = normalize_df(raw_target_df, means, stds)
-target_df = pd.merge(target_df, subjects[['participant_id', 'session_id']], on=['participant_id', 'session_id'])
+
 if args.debug:
     target_df = target_df.iloc[:10]
 
@@ -110,6 +119,14 @@ predictions, losses = test(model,
                            eval_mode=args.eval_mode,
                            save_predictions=True)
 
+predictions['volumes'] = stds[1:].reshape((1, -1)) * predictions['volumes'] + means[1:].reshape((1, -1))
+predictions['age'] = stds[0].reshape((1, 1)) * predictions['age'] + means[0].reshape((1, 1))
+
 for key in predictions.keys():
-    np.save(key+'.npy', predictions(key))
-    pd.DataFrame(losses).to_csv('losses.csv', index=False)
+    # saving predictions
+    np.save(os.path.join(output_path, key+'.npy'), predictions[key])
+
+# saving losses
+losses_file = open(os.path.join(output_path, 'losses.json'), "w")
+json.dump(losses, losses_file)
+losses_file.close()
