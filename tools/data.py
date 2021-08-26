@@ -53,7 +53,7 @@ def compute_target_df(study='adni', pipeline_name='t1-volume', atlas_id='AAL2', 
     last_column_index = df_data.columns.get_loc(last_column_name)
 
     # other data to fetch
-    col_names = ['participant_id', 'session_id', 'sex', 'age']
+    col_names = ['participant_id', 'session_id', 'sex', 'diagnosis', 'age']
     add_indexes = [df_data.columns.get_loc(col_name) for col_name in col_names]
 
     # compute dataframe
@@ -72,13 +72,23 @@ def normalize_df(raw_dataframe, norm_means, norm_stds):
     Normalize raw_dataframe scalar columns using norm_means and norm_stds
 
     :param raw_dataframe: pandas dataframe
-    :param norm_means: pandas series containing normalization means
-    :param norm_stds: pandas series containing normalization stds
+    :param norm_means: array containing normalization means
+    :param norm_stds: array containing normalization stds
     :return: normalized pandas DataFrame
     """
-    scalar_cols = [col for col in raw_dataframe.columns if col not in ['participant_id', 'session_id', 'sex']]
-    raw_dataframe[scalar_cols] = (raw_dataframe[scalar_cols] - norm_means.to_numpy().reshape((1, -1))) / norm_stds.to_numpy().reshape((1, -1))
+    scalar_cols = get_scalar_columns(raw_dataframe)
+    raw_dataframe[scalar_cols] = (raw_dataframe[scalar_cols] - norm_means.reshape((1, -1))) / norm_stds.reshape((1, -1))
     return raw_dataframe
+
+
+def get_scalar_columns(df):
+    """
+    Fetch names of scalar columns.
+
+    :param df: pandas dataframe
+    :return: list of strings
+    """
+    return [col for col in df.columns if col not in ['participant_id', 'session_id', 'diagnosis', 'sex']]
 
 
 def get_normalization_factors(training_data, pipeline_name='t1-volume', atlas_id='AAL2', study='adni'):
@@ -90,8 +100,8 @@ def get_normalization_factors(training_data, pipeline_name='t1-volume', atlas_id
     :param atlas_id: string
     :param study: string
     :return:
-        - means: pandas series
-        - stds: pandas series
+        - means: array
+        - stds: array
     """
     # compute raw (unnormalized) dataframe
     df_add_data = compute_target_df(study, pipeline_name, atlas_id)
@@ -100,10 +110,10 @@ def get_normalization_factors(training_data, pipeline_name='t1-volume', atlas_id
     temp_df = pd.merge(training_data[['participant_id', 'session_id']],
                        df_add_data, on=['participant_id', 'session_id'], how='left')
     # scalar_cols = temp_df.columns.difference(['participant_id', 'session_id', 'sex'])
-    scalar_cols = [col for col in temp_df.columns if col not in ['participant_id', 'session_id', 'sex']]
+    scalar_cols = get_scalar_columns(temp_df)
     # df_add_data[scalar_cols] contains only scalar columns with (patient, session) from training set
     means, stds = temp_df[scalar_cols].mean(), temp_df[scalar_cols].std()
-    return means, stds
+    return means.to_numpy(), stds.to_numpy()
 
 
 def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2', study='adni'):
@@ -129,7 +139,7 @@ def fetch_add_data(training_data, pipeline_name='t1-volume', atlas_id='AAL2', st
     temp_df = pd.merge(training_data[['participant_id', 'session_id']],
                        df_add_data, on=['participant_id', 'session_id'], how='left')
     # scalar_cols = temp_df.columns.difference(['participant_id', 'session_id', 'sex'])
-    scalar_cols = [col for col in temp_df.columns if col not in ['participant_id', 'session_id', 'sex']]
+    scalar_cols = get_scalar_columns(temp_df)
     # df_add_data[scalar_cols] contains only scalar columns with (patient, session) from training set
     means, stds = temp_df[scalar_cols].mean(), temp_df[scalar_cols].std()
     df_add_data[scalar_cols] = (df_add_data[scalar_cols] - means) / stds
@@ -300,7 +310,7 @@ class MRIDatasetImage(MRIDataset):
                                    (self.df_add_data.session_id == session)]
         sex = (temp_df.sex.to_numpy().item() == 'F') + 0.
         age = temp_df.age.to_numpy().item()
-        volumes = temp_df.drop(columns=['participant_id', 'session_id', 'sex', 'age']).to_numpy().squeeze()
+        volumes = temp_df.drop(columns=['participant_id', 'session_id', 'sex', 'age', 'diagnosis']).to_numpy().squeeze()
 
         sample = {'image': image, 'label': label, 'participant_id': participant, 'session_id': session,
                   'image_path': image_path, 'age': age, 'sex': sex, 'volumes': volumes}

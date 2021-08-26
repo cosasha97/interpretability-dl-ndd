@@ -1,8 +1,22 @@
 import torch
 from tqdm import tqdm
+import pdb
 
 # torch
 import torch.nn as nn
+
+
+def set_seed(seed):
+    """
+    Fix seed.
+    :param seed: int.
+    """
+    import torch
+    import random
+    import numpy as np
+    torch.manual_seed(seed)  # pytorch
+    random.seed(seed)
+    np.random.seed(seed)
 
 
 def compute_loss(output_x, true_x, output_v, true_v, output_age, true_age, output_sex, true_sex,
@@ -124,7 +138,8 @@ def test(model,
          to_cuda=True,
          rescaling=None,
          compute_metrics=True,
-         eval_mode=True):
+         eval_mode=True,
+         save_predictions=False):
     """
     Test a trained model
 
@@ -133,6 +148,7 @@ def test(model,
         loader: data loader
         to_cuda: bool. If True, moves data to gpu.
         compute_metrics: bool. If True, compute evaluation metrics for each branch.
+        save_predictions: bool. If True, save predictions for each branch over the whole dataset.
     """
     model.reset_metrics()
     if eval_mode:
@@ -143,6 +159,22 @@ def test(model,
     test_loss = 0
     L_disease, L_vol, L_age, L_sex = 0, 0, 0, 0
     correct = 0.
+
+    # predictions
+    if save_predictions:
+        participant_id = []
+        session_id = []
+        pred_disease = None
+        pred_volumes = None
+        pred_age = None
+        pred_sex = None
+
+        def update_predictions(preds, new_preds):
+            if preds is None:
+                return new_preds
+            else:
+                return np.concatenate((preds, new_preds), axis=0)
+
     with torch.no_grad():
         for batch_idx, data in enumerate(loader):
             if torch.cuda.is_available() and to_cuda:
@@ -163,6 +195,15 @@ def test(model,
                 disease, volumes, age, sex = model(data,
                                                    compute_metrics=compute_metrics,
                                                    rescaling=rescaling)
+
+            # saving predictions
+            if save_predictions:
+                participant_id = participant_id + data['participant_id']
+                session_id = session_id + data['session_id']
+                pred_disease = update_predictions(pred_disease, disease.cpu())
+                pred_volumes = update_predictions(pred_volumes, volumes.cpu())
+                pred_age = update_predictions(pred_age, age.cpu())
+                pred_sex = update_predictions(pred_sex, sex.cpu())
 
             losses = compute_loss(disease.float(), data['label'].float(),
                                   volumes.float(), data['volumes'].float(),
@@ -198,6 +239,14 @@ def test(model,
     # scale metrics and add them to dictionary
     if compute_metrics:
         losses.update(model.compute_metrics())
+
+    if save_predictions:
+        return {'id': np.array([participant_id, session_id]).T,
+                'disease': pred_disease,
+                'volumes': pred_volumes,
+                'age': pred_age,
+                'sex': pred_sex}, \
+               losses
 
     return losses
 

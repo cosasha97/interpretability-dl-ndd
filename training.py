@@ -116,9 +116,7 @@ if not args.debug:
     stdout_logger = config_logger(args.output_dir)
 
 # fix seeds
-torch.manual_seed(args.seed)  # pytorch
-random.seed(args.seed)
-np.random.seed(args.seed)
+set_seed(args.seed)
 
 # resume training ?
 if args.resume_training:
