@@ -33,7 +33,7 @@ from tools.explanations.GradCam import *
 import pdb
 
 parser = argparse.ArgumentParser(description='Attribution maps generation')
-parser.add_argument('--model_folder', type=str, default=None,
+parser.add_argument('--model_folder', type=str, default='results/models/model_85',
                     help="""Path to configuration (folder). """)
 parser.add_argument('--dataset', type=str, default='val',
                     help="Dataset used to generate attribution maps.")
@@ -92,7 +92,6 @@ train_transforms, all_transforms = get_transforms('image', minmaxnormalization=T
 # stds, df_add_data = fetch_add_data(training_df)
 raw_target_df = compute_target_df(study=study)
 raw_target_df = pd.merge(raw_target_df, subjects[['participant_id', 'session_id']], on=['participant_id', 'session_id'])
-raw_target_df.to_csv(os.path.join(output_path, 'raw_target_df.csv'), index=False)
 means, stds = get_normalization_factors(training_df)
 target_df = normalize_df(raw_target_df, means, stds)
 
