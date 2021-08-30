@@ -3,15 +3,18 @@ import pdb
 import torch
 import numpy as np
 import pandas as pd
+import os
 from os import path
 import re
 from tools.settings import *
+from tools.explanations.analysis.utils import *
 
 # clinicaDL
 from clinicadl.tools.deep_learning.data import generate_sampler, return_dataset, MRIDataset, MRIDatasetImage, \
     MRIDatasetSlice, get_transforms
 
 
+# data generation
 def get_subjects(study='aibl'):
     """
     Fetch subjects for a given study.
@@ -319,3 +322,125 @@ class MRIDatasetImage(MRIDataset):
 
     def num_elem_per_image(self):
         return 1
+
+
+# data analysis
+def fetch_results(dataset, model_folder='results/models/model_85/'):
+    """
+    Fetch results (predictions) as well as targets, format targets,
+    and merge everything in a single dataframe.
+
+    Params:
+        - dataset: string ('val', 'test')
+        - model_folder: string, path to folder of the model used to generate predictions
+    Returns:
+        - pandas DataFrame
+    """
+    prediction_path = os.path.join(model_folder, 'predictions/')
+    # load target dataframe
+    raw_target_df = pd.read_csv(os.path.join(prediction_path, dataset, 'raw_target_df.csv'))
+    # format targets
+    raw_target_df.diagnosis = (raw_target_df.diagnosis == 'AD').astype(int)
+    raw_target_df.sex = (raw_target_df.sex == 'F').astype(int)
+    # load predictions
+    ID = np.load(os.path.join(prediction_path, dataset, 'id.npy'))
+    disease_preds = np.load(os.path.join(prediction_path, dataset, 'disease.npy'))
+    age_preds = np.load(os.path.join(prediction_path, dataset, 'age.npy'))
+    sex_preds = np.load(os.path.join(prediction_path, dataset, 'sex.npy'))
+    # store predictions in dataframe
+    df_preds = pd.DataFrame({'participant_id': ID[:, 0],
+                             'session_id': ID[:, 1],
+                             'diagnosis': disease_preds.flatten(),
+                             'age': age_preds.flatten(),
+                             'sex': sex_preds.flatten()})
+    # merge dataframes
+    cols = ['participant_id', 'session_id', 'diagnosis', 'age', 'sex']
+    data = raw_target_df[cols].merge(df_preds, on=['participant_id', 'session_id'], suffixes=('_true', '_pred'))
+
+    return data
+
+
+def classification(target, data, q=25):
+    """
+    Determine TP, TN, FP, FN for diagnosis and sex targets.
+    For age, determine the 25% best (+1) and worst predictions (-1).
+    Params:
+        - target: string
+        - data: pandas dataframe containing prediction target values
+        - q: int, percentile (only useful for age)
+    """
+    if target in ['diagnosis', 'sex']:
+        y_true = data[target + '_true']
+        y_pred = (data[target + '_pred'] > 0.5).astype(int)
+        data[target + '_class'] = np.nan
+        data[target + '_class'][(y_true == y_pred) & (y_true == 1)] = 'TP'
+        data[target + '_class'][(y_true == y_pred) & (y_true == 0)] = 'TN'
+        data[target + '_class'][(y_true != y_pred) & (y_pred == 1)] = 'FP'
+        data[target + '_class'][(y_true != y_pred) & (y_pred == 0)] = 'FN'
+    elif target == 'age':
+        age_delta = (data.age_true - data.age_pred).abs().to_numpy()
+        q1 = np.percentile(age_delta, q=q)
+        q3 = np.percentile(age_delta, q=100-q)
+        data['age_class'] = 0
+        data['age_class'][age_delta < q1] = 1
+        data['age_class'][age_delta > q3] = -1
+    else:
+        raise Exception("Target unknown!")
+
+
+def compute_classification_df(dataset, model_folder='results/models/model_85/', save=True):
+    """
+    Compute classification for all preds (diagnosis, age, sex).
+
+    Params:
+        - dataset: string ('val', 'test')
+        - model_folder: string, path to folder of the model used to generate predictions
+    Returns:
+        - pandas DataFrame
+    """
+    data = fetch_results(dataset, model_folder)
+    for target in ['sex', 'diagnosis', 'age']:
+        classification(target, data)
+    df_classification = data[['participant_id', 'session_id', 'diagnosis_class', 'sex_class', 'age_class']]
+    if save:
+        df_classification.to_csv(os.path.join(model_folder, 'predictions', dataset, 'df_classification.csv'),
+                                 index=False)
+    return df_classification
+
+
+def results_analysis(dataset, model_folder='results/models/model_85/'):
+    """
+    Compute global analysis for age, sex and diagnosis.
+    For classification task (i.e. sex and diagnosis), compute MIR for each of the following
+    groups: 'TP', 'TN', 'FP', 'FN'.
+    For regression task (i.e. age), compute MIR for each of the following groups: +1, -1.
+    Save pandas DataFrame in the subfolder of model_folder 'results/'.
+    """
+    # load atlas
+    atlas_tsv, _ = load_atlas(custom_tsv=True)
+    # load classification
+    df_classification = pd.read_csv(os.path.join(model_folder, 'predictions', dataset, 'df_classification.csv'))
+    for target in ['disease', 'sex', 'age']:
+        scores_path = os.path.join(model_folder, 'attribution_maps/GC', dataset, target, 'normalized_scores.csv')
+        normalized_scores = pd.read_csv(scores_path)
+        # merge df_classification with normalized_scores
+        merge = normalized_scores.merge(df_classification, on=['participant_id', 'session_id'])
+        d = {}
+        # define classes
+        if target in ['disease', 'sex']:
+            classes = ['TP', 'TN', 'FP', 'FN']
+        else:
+            # age
+            classes = [1, -1]
+        # rename target
+        if target == 'disease':
+            target = 'diagnosis'
+        # compute class analysis
+        cols_class = ['diagnosis_class', 'sex_class', 'age_class']
+        for class_ in classes:
+            d[class_] = MIR(merge[merge[target + '_class'] == class_].drop(columns=cols_class), atlas_tsv, concat_df=True)
+        # save analysis
+        output_path = os.path.join(model_folder, 'analysis', dataset, 'summary_MIR_{}.csv'.format(target))
+        final_df = pd.concat(d.values(), axis=1, keys=d.keys())
+        final_df.to_csv(output_path, index=False)
+

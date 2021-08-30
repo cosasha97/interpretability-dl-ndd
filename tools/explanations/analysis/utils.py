@@ -7,12 +7,15 @@ from tools.settings import *
 from tools.data import *
 import ast
 import collections
+from tqdm import tqdm
 
 
-def load_atlas():
+def load_atlas(custom_tsv=False):
     """
     Load atlas (map & tsv).
 
+    Params:
+        - custom_tsv: bool. If True, load custom tsv. Otherwise, load original atlas tsv.
     Returns:
         - atlas_tsv: pandas DataFrame with roi_name and roi_value columns
         - atlas_map: array
@@ -22,9 +25,15 @@ def load_atlas():
     # atlas_path = '../clinica/clinica/resources/atlases/atlas-AAL2_dseg.nii.gz'
 
     # load atlas
-    atlas_tsv = pd.read_csv(
-        '/network/lustre/dtlake01/aramis/users/sasha.collin/clinica/clinica/resources/atlases/atlas-AAL2_dseg.tsv',
-        sep='\t')
+    if custom_tsv:
+        # load custom tsv
+        atlas_tsv = pd.read_csv('atlas/atlas-AAL2_space-MNI152NLin2009cSym_dseg.csv')
+        atlas_tsv.roi_value = atlas_tsv.roi_value.apply(ast.literal_eval)
+    else:
+        # load original tsv
+        atlas_tsv = pd.read_csv(
+            '/network/lustre/dtlake01/aramis/users/sasha.collin/clinica/clinica/resources/atlases/atlas-AAL2_dseg.tsv',
+            sep='\t')
     atlas_path = 'atlas/atlas-AAL2_space-MNI152NLin2009cSym_dseg.nii.gz'
     atlas = nib.load(atlas_path)
     atlas_map = atlas.get_fdata()
@@ -199,7 +208,7 @@ def compute_scores(data_path, atlas_tsv, atlas_map):
     # fetch file names
     files = [file for file in os.listdir(data_path) if os.path.splitext(file)[1] == '.npy']
     for k, file in tqdm(enumerate(files)):
-        filename = file.split('.npy')[0]
+        # filename = file.split('.npy')[0]
         participant_id, session_id = file.strip('.npy').split('_')
         # load attention map
         att_map = np.load(os.path.join(data_path, file))
@@ -243,7 +252,7 @@ def MOR(region_list, subjects_nb, N_regions=10):
     return df.reset_index().drop(columns=['index'])
 
 
-def MIR(df_scores, atlas_tsv, N_regions=10):
+def MIR(df_scores, atlas_tsv, N_regions=10, concat_df=True):
     """
     Determine most important regions given a dataframe of scores df_scores.
     Params:
@@ -252,6 +261,7 @@ def MIR(df_scores, atlas_tsv, N_regions=10):
             will be dropped.
         - atlas_tsv: pandas DataFrame containing at least the column 'roi_name'
         - N_regions: int, number of most important regions to determine.
+        - concat_df: bool. If true, concatenate both dataframes (regions & main regions)
     """
     # total number of samples
     samples_nb = len(df_scores)
@@ -271,4 +281,62 @@ def MIR(df_scores, atlas_tsv, N_regions=10):
     df_regions = MOR(regions, samples_nb, N_regions)
     df_main_regions = MOR(main_regions, samples_nb, N_regions)
 
+    if concat_df:
+        # concatenate dataframe
+        df_main_regions.rename(columns={'region': 'main_region', 'freq': 'main_freq'}, inplace=True)
+        return pd.concat([df_regions, df_main_regions], axis=1)
+    
     return df_regions, df_main_regions
+
+
+# dice score
+def dice_score(target, prediction):
+    """
+    Compute dice score and continuous dice score.
+    Params:
+        - target: binary array
+        - prediction: array with continuous values between 0 and 1
+    Returns:
+        - DC: float, dice score
+        - cDC: float, continuous dice score
+    """
+    targ_s = target.sum()
+    pred_s = prediction.sum()
+    prod_s = (target * prediction).sum()
+    # dice score
+    DC = 2 * prod_s / (targ_s + pred_s)
+    # continuous dice score
+    c = prod_s / (targ_s * (pred_s > 0)).sum()
+    cDC = 2 * prod_s / (c * targ_s + pred_s)
+
+    return DC, cDC
+
+
+def dice_score_computation(prediction, volume_index, atlas_tsv, atlas_map, resize=True):
+    """
+    Compute dice score and continuous dice score.
+
+    Params:
+        - prediction: array with continuous values between 0 and 1
+        - atlas_tsv: pandas DataFrame with roi_name and roi_value
+        - atlas_map: array, index of the regions
+        - resize: bool. If True, resize data to atlas_map.shape
+
+    Returns:
+        - DC: float, dice score
+        - cDC: float, continuous dice score
+    """
+    # check for NaN
+    if np.isnan(prediction).sum() > 0:
+        print('NaN was found')
+        return None, None
+
+    if resize:
+        resized_prediction = threshold_att_map(zoom(prediction, atlas_map.shape / np.array(prediction.shape)))
+    else:
+        resized_prediction = prediction
+
+    roi_value = atlas_tsv.roi_value.iloc[volume_index]
+    target = (atlas_map == roi_value).astype(float)
+
+    return dice_score(target, resized_prediction)
